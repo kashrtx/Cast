@@ -1,0 +1,2911 @@
+/* Custom styles for Google Gemini Flash Character RolePlay */
+
+/* Utility classes */
+.hidden {
+    display: none !important;
+}
+
+/* Fix for scroll-related issues */
+html, body {
+    height: 100%;
+    width: 100%;
+    overflow-x: hidden;
+    /* Don't prevent all scrolling, allow it on non-chat views */
+    overflow-y: auto;
+}
+
+/* Chat view specific styles to prevent unwanted scrolling only in chat */
+body.chat-view-active {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    overflow-y: hidden;
+}
+
+/* Improved container for the app */
+#app {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    /* Don't restrict height, allow content to determine it */
+    height: auto;
+    overflow: visible;
+}
+
+/* Main content with proper overflow handling */
+#app > main {
+    flex: 1;
+    position: relative;
+    /* Allow scrolling in main by default */
+    overflow-y: auto;
+    padding-top: var(--header-h, 56px); /* Measured from the real header */
+}
+
+/* Make character and settings views scrollable */
+#characters-view, #settings-view {
+    overflow-y: auto;
+    height: auto;
+    min-height: calc(100vh - var(--header-h, 56px));
+    padding-bottom: 2rem; /* Add some padding at the bottom */
+}
+
+/* Only fix the chat view height */
+#chat-view {
+    height: calc(100vh - var(--header-h, 56px)); /* Measured from the real header */
+    overflow: hidden;
+    display: flex;
+    flex-direction: row;
+}
+
+/* Mobile responsiveness */
+@media (max-width: 1024px) {
+    #character-sidebar {
+        position: fixed;
+        left: 0;
+        top: var(--header-h, 56px);
+        bottom: 0;
+        z-index: 50;
+        transform: translateX(-100%);
+        width: 280px;
+        max-width: 90%; /* Ensure it doesn't exceed screen width */
+        background: white;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        overflow-y: auto; /* Ensure content is scrollable */
+        max-height: calc(100vh - var(--header-h, 56px));
+        height: calc(100vh - var(--header-h, 56px));
+        position: fixed !important; /* Ensure it stays fixed regardless of other styles */
+        transition: transform 0.3s ease;
+    }
+
+    /* Show sidebar by default when no chat is selected */
+    #chat-view:not(.chat-active) #character-sidebar {
+        transform: translateX(0);
+    }
+
+    #character-sidebar.sidebar-open {
+        transform: translateX(0);
+    }
+
+    /* Additional styles for scrollable sidebar content */
+    #sidebar-characters {
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
+    }
+    
+    /* Toggle sidebar button styles */
+    #toggle-sidebar-btn,
+    #show-characters-btn,
+    #show-chat-sidebar-btn {
+        display: block;
+    }
+    
+    /* Show hamburger menu when chat is active */
+    .chat-active #show-chat-sidebar-btn {
+        display: block;
+    }
+    
+    /* Show hamburger menu in placeholder view */
+    #chat-placeholder:not(.hidden) #show-characters-btn {
+        display: block;
+    }
+    
+    /* X icon for closing sidebar */
+    #character-sidebar.sidebar-open #toggle-sidebar-btn {
+        display: block;
+    }
+    
+    /* Overlay for sidebar on mobile */
+    .sidebar-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: rgba(0, 0, 0, 0.5);
+        z-index: 45; /* Lower than sidebar but higher than other content */
+        display: none;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+        pointer-events: none; /* Don't capture clicks when not active */
+    }
+    
+    /* Active overlay */
+    .sidebar-overlay.active {
+        display: block;
+        opacity: 1;
+        pointer-events: auto; /* Capture clicks when active */
+    }
+
+    /* Adjust header spacing */
+    header .container {
+        padding-left: 1rem;
+    }
+    
+    /* Fix header position to ensure sidebar stays relative to it */
+    #app > header {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        z-index: 51; /* Higher than sidebar */
+        width: 100%;
+        min-height: 52px; /* A floor rather than a fixed height, so the header can fit its contents */
+
+        display: flex;
+        align-items: center;
+        padding: 0 !important; /* Remove padding to prevent overflow */
+    }
+    
+    /* Add padding to main content to account for fixed header */
+    #app > main {
+        padding-top: var(--header-h, 56px);
+        position: relative;
+        height: calc(100vh - var(--header-h, 56px));
+        overflow: hidden;
+    }
+}
+
+@media (max-width: 640px) {
+    .container {
+        padding-left: 0.5rem;
+        padding-right: 0.5rem;
+    }
+
+    /* The header sizes to its contents. It used to be pinned to 46 pixels, which the
+       navigation pill did not fit inside, so the pill hung out of the bottom and the content
+       below started too high and slid under it. */
+    #app > header {
+        padding: 0.4rem 0.6rem !important;
+        min-height: 0 !important;
+        height: auto !important;
+    }
+
+    header .container {
+        padding-left: 0.5rem;
+        padding-right: 0.5rem;
+    }
+
+    #character-sidebar {
+        top: var(--header-h, 56px);
+        max-height: calc(100vh - var(--header-h, 56px));
+        height: calc(100vh - var(--header-h, 56px));
+    }
+    
+    /* Adjust padding for fixed header in mobile */
+    #app > main {
+        padding-top: var(--header-h, 56px);
+    }
+
+    header h1 {
+        font-size: 0.8rem; /* Even smaller on mobile */
+        line-height: 1.2;
+        max-width: 40%;
+        margin-right: 0.5rem;
+    }
+
+    header nav {
+        gap: 0.25rem;
+        align-items: center;
+    }
+
+    header nav button {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.75rem;
+        height: 28px; /* Smaller buttons on mobile */
+    }
+
+    header nav button i {
+        margin-right: 0;
+    }
+
+    header nav button span {
+        display: none;
+    }
+
+
+    .message-bubble {
+        max-width: 85%;
+    }
+
+    #message-input {
+        font-size: 16px; /* Prevent zoom on mobile */
+    }
+
+    /* Adjust header for mobile */
+    header h1 {
+        font-size: 1rem;
+    }
+
+    header nav button {
+        padding: 0.25rem 0.5rem;
+    }
+
+    header nav button i {
+        margin-right: 0;
+    }
+
+    header nav button span {
+        display: none;
+    }
+
+    #app > main {
+        padding-top: var(--header-h, 56px);
+    }
+    
+    #characters-view, #settings-view {
+        min-height: calc(100vh - var(--header-h, 56px));
+    }
+    
+    #chat-view {
+        height: calc(100vh - var(--header-h, 56px));
+    }
+
+    /* Make character and settings content scrollable on mobile */
+    #characters-view .container, #settings-view .container {
+        max-height: calc(100vh - var(--header-h, 56px));
+        overflow-y: auto;
+        padding-bottom: 50px; /* Extra padding to ensure scroll works */
+    }
+    
+    /* Ensure container allows scrolling */
+    .container {
+        width: 100%;
+        max-width: 100%;
+    }
+    
+    /* Fix for form inputs */
+    #chat-form {
+        position: relative;
+        z-index: 2;
+    }
+    
+    /* Ensure the message input doesn't get hidden */
+    #message-input {
+        padding: 8px;
+        min-height: 40px;
+    }
+
+    /* Make chat form more compact on mobile */
+    #chat-form {
+        display: flex;
+        align-items: center;
+    }
+    
+    /* Ensure message input is properly sized */
+    #message-input {
+        max-height: 80px;
+        min-height: 40px;
+        padding: 8px;
+        font-size: 16px; /* Prevent zoom on iOS */
+    }
+    
+    /* Make sure send button is properly sized and positioned on mobile */
+    #send-message-btn {
+        width: 48px !important;
+        height: 48px !important;
+        min-width: 48px !important;
+        min-height: 48px !important;
+        margin-left: 8px;
+        background-color: var(--color-primary, #4F46E5);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+    }
+    
+    /* Increase icon size for better visibility */
+    #send-message-btn i {
+        font-size: 1.4rem;
+    }
+
+    /* Ensure chat view takes up proper space */
+    #chat-view {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        overflow: hidden;
+    }
+    
+    /* Ensure chat window is properly positioned */
+    #chat-window {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        position: relative;
+        padding-bottom: 70px; /* Make room for the fixed input container */
+    }
+    
+    /* Keep chat messages area scrollable */
+    #chat-messages {
+        flex: 1;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+    
+    /* This is now handled by the consolidated rule in @media (max-width: 768px) */
+}
+
+/* Mobile specific styles */
+@media (max-width: 768px) {
+    #character-sidebar {
+        width: 100% !important; /* Full width on mobile */
+    }
+    
+    #character-sidebar.sidebar-open {
+        transform: translateX(0);
+        width: 100%; /* Full width sidebar when open */
+    }
+}
+
+/* Message containers to ensure consistent alignment */
+.message-container-user {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    max-width: 85%;
+}
+
+.message-container-character {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    max-width: 85%;
+}
+
+/* Chat message bubbles - ensure consistent sizes */
+.message-bubble {
+    position: relative;
+    min-width: 60px; /* Minimum width for short messages */
+    max-width: 100%; /* Fill container width */
+    padding: 12px 16px;
+    margin: 4px 0;
+    border-radius: 18px;
+    word-wrap: break-word;
+    word-break: break-word; /* Prevents text from going vertical */
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+    display: inline-block; /* Ensures message stays inline */
+    opacity: 1;
+}
+
+/* Only animate new messages */
+.message-bubble.new-message {
+    animation: messageAppear 0.2s ease-out;
+}
+
+@keyframes messageAppear {
+    from {
+        opacity: 0;
+        transform: translateY(3px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Markdown styles in messages */
+/* A stressed word takes the body colour, so it reads as part of what the character
+   is saying rather than as an aside. */
+.message-bubble em,
+.message-bubble i {
+    font-style: italic;
+    color: inherit;
+}
+
+/* Stage directions stay muted, so they read as a quiet aside.
+   This has to name the element as well as the class to beat the rule above.
+   That was the real problem: the plain em rule is a class plus an element, which
+   outranks a bare class, so it was winning and actions were being drawn in the same
+   grey as stressed words. The distinction existed in the markup and never made it to
+   the screen. */
+.message-bubble em.roleplay-action {
+    color: #6b7280;
+    font-style: italic;
+}
+
+/* And in the blue bubble, where the text is light, an action is dimmed rather than
+   greyed, because grey on blue is unreadable. */
+.user-message em.roleplay-action {
+    color: rgba(255, 255, 255, 0.72);
+}
+
+.message-bubble strong {
+    font-weight: 600;
+}
+
+.message-bubble code {
+    background: rgba(0, 0, 0, 0.1);
+    padding: 2px 4px;
+    border-radius: 4px;
+    font-family: monospace;
+    font-size: 0.9em;
+}
+
+.message-bubble pre {
+    background: rgba(0, 0, 0, 0.05);
+    padding: 8px;
+    border-radius: 6px;
+    overflow-x: auto;
+    margin: 8px 0;
+}
+
+.message-bubble pre code {
+    background: none;
+    padding: 0;
+    border-radius: 0;
+}
+
+.message-bubble blockquote {
+    border-left: 3px solid rgba(0, 0, 0, 0.2);
+    margin: 8px 0;
+    padding-left: 12px;
+    font-style: italic;
+}
+
+.message-bubble ul,
+.message-bubble ol {
+    margin: 8px 0;
+    padding-left: 24px;
+}
+
+.message-bubble li {
+    margin: 4px 0;
+}
+
+.message-bubble p {
+    margin: 8px 0;
+    white-space: pre-wrap;
+}
+
+.message-bubble p:first-child {
+    margin-top: 0;
+}
+
+.message-bubble p:last-child {
+    margin-bottom: 0;
+}
+
+/* Headers in messages */
+.message-bubble h1,
+.message-bubble h2,
+.message-bubble h3,
+.message-bubble h4,
+.message-bubble h5,
+.message-bubble h6 {
+    font-weight: 600;
+    line-height: 1.25;
+    margin: 16px 0 8px;
+}
+
+.message-bubble h1 { font-size: 1.5em; }
+.message-bubble h2 { font-size: 1.3em; }
+.message-bubble h3 { font-size: 1.1em; }
+.message-bubble h4 { font-size: 1em; }
+.message-bubble h5 { font-size: 0.9em; }
+.message-bubble h6 { font-size: 0.8em; }
+
+/* Tables in messages */
+.message-bubble table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 8px 0;
+}
+
+.message-bubble th,
+.message-bubble td {
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    padding: 6px 8px;
+    text-align: left;
+}
+
+.message-bubble th {
+    background: rgba(0, 0, 0, 0.05);
+    font-weight: 600;
+}
+
+/* Horizontal rule */
+.message-bubble hr {
+    border: none;
+    border-top: 1px solid rgba(0, 0, 0, 0.1);
+    margin: 12px 0;
+}
+
+/* Strikethrough */
+.message-bubble del {
+    text-decoration: line-through;
+    opacity: 0.7;
+}
+
+/* Adjust markdown styles for user messages (light text) */
+.user-message em,
+.user-message i {
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.user-message code {
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
+}
+
+.user-message pre {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.user-message blockquote {
+    border-left-color: rgba(255, 255, 255, 0.3);
+}
+
+.user-message th {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.user-message td,
+.user-message th {
+    border-color: rgba(255, 255, 255, 0.2);
+}
+
+.user-message hr {
+    border-color: rgba(255, 255, 255, 0.2);
+}
+
+.user-message {
+    background-color: #1982FC;
+    color: white;
+    border-bottom-right-radius: 5px;
+    margin-left: auto;
+}
+
+.character-message {
+    background-color: #E9E9EB;
+    color: #000;
+    border-bottom-left-radius: 5px;
+    margin-right: auto;
+}
+
+/* Typing indicator */
+.typing-indicator {
+    display: flex;
+    align-items: center;
+    padding: 8px 16px;
+    background-color: #E9E9EB;
+    border-radius: 18px;
+    width: fit-content;
+    margin: 8px 0;
+}
+
+.typing-dot {
+    height: 8px;
+    width: 8px;
+    border-radius: 50%;
+    background-color: #606060;
+    margin: 0 2px;
+    animation: typing 1.5s infinite ease-in-out;
+}
+
+.typing-dot:nth-child(1) {
+    animation-delay: 0s;
+}
+
+.typing-dot:nth-child(2) {
+    animation-delay: 0.3s;
+}
+
+.typing-dot:nth-child(3) {
+    animation-delay: 0.6s;
+}
+
+@keyframes typing {
+    0% {
+        transform: translateY(0);
+    }
+    50% {
+        transform: translateY(-5px);
+    }
+    100% {
+        transform: translateY(0);
+    }
+}
+
+/* Character avatar */
+.character-avatar {
+    width: 36px !important;
+    height: 36px !important;
+    min-width: 36px !important; /* Prevent shrinking */
+    min-height: 36px !important; /* Prevent shrinking */
+    border-radius: 50%;
+    overflow: hidden;
+    margin-right: 8px;
+    background-color: #ddd;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    flex-shrink: 0; /* Prevent flexbox from shrinking this element */
+}
+
+/* Smooth loading animations */
+.fade-in {
+    animation: fadeIn 0.3s ease-in;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Settings toggle animation */
+.settings-enter {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.5s ease-in-out;
+}
+
+.settings-enter-active {
+    max-height: 500px;
+}
+
+/* Custom scrollbar for chat window */
+.chat-window::-webkit-scrollbar {
+    width: 6px;
+}
+
+.chat-window::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.chat-window::-webkit-scrollbar-thumb {
+    background-color: rgba(0, 0, 0, 0.2);
+    border-radius: 10px;
+}
+
+/* Character selection highlight */
+.character-item {
+    transition: all 0.2s ease;
+    cursor: pointer;
+}
+
+.character-item:hover, .character-item.active {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* Character sidebar and chat window take full height */
+#character-sidebar, 
+#chat-placeholder,
+#chat-window {
+    height: 100%;
+    overflow: hidden;
+    flex-shrink: 0;
+}
+
+/* Ensure chat window is visible and positioned correctly */
+#chat-window {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-width: 0; /* Allow it to shrink if needed */
+    flex: 1 1 auto;
+    background-color: #f9f9f9;
+}
+
+#chat-placeholder {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Chat messages area */
+#chat-messages {
+    flex: 1 1 auto;
+    overflow-y: scroll; /* Changed from auto to scroll for better mobile behavior */
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    /* Remove fixed min-height that could cause spacing issues */
+    height: auto;
+    /* Use flexible height calculation */
+    max-height: calc(100% - 104px); /* Updated for smaller headers: chat header (48px) + input area (~56px) */
+    -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
+    scroll-behavior: smooth; /* Smooth scrolling */
+    position: relative; /* Create stacking context */
+    z-index: 1; /* Ensure it's above other elements */
+}
+
+/* Ensure first message has some padding at the top */
+#chat-messages > div:first-child {
+    margin-top: 8px;
+}
+
+/* Ensure last message has some padding at the bottom */
+#chat-messages > div:last-child {
+    margin-bottom: 8px;
+}
+
+/* Prevent the chat header from blocking content */
+#chat-window > div:first-of-type {
+    flex-shrink: 0;
+    height: 48px; /* Slightly reduced height */
+    display: flex;
+    align-items: center;
+    padding: 0 0.75rem; /* Reduced padding */
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05); /* Subtle shadow */
+}
+
+/* Adjust chat header title and subtitle */
+#chat-header-title {
+    font-size: 1rem;
+    line-height: 1.2;
+    margin: 0;
+}
+
+#chat-header-subtitle {
+    font-size: 0.75rem;
+    line-height: 1.2;
+    margin: 0;
+}
+
+/* Message input area fixes */
+#chat-window > div:last-of-type {
+    flex-shrink: 0;
+    position: relative;
+    z-index: 2;
+}
+
+/* Force full width for message containers */
+.flex.justify-end, .flex.justify-start {
+    width: 100%;
+    margin: 8px 0;
+    max-width: 100%;
+}
+
+/* Improved scrollbars for all scrollable elements */
+.overflow-auto::-webkit-scrollbar,
+#chat-messages::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+.overflow-auto::-webkit-scrollbar-track,
+#chat-messages::-webkit-scrollbar-track {
+    background: rgba(0,0,0,0.05);
+    border-radius: 3px;
+}
+
+.overflow-auto::-webkit-scrollbar-thumb,
+#chat-messages::-webkit-scrollbar-thumb {
+    background: rgba(0,0,0,0.2);
+    border-radius: 3px;
+}
+
+.overflow-auto::-webkit-scrollbar-thumb:hover,
+#chat-messages::-webkit-scrollbar-thumb:hover {
+    background: rgba(0,0,0,0.3);
+}
+
+/* Add active styling for buttons */
+button:active {
+    transform: scale(0.98);
+}
+
+/* Ensure buttons are clickable and have visual feedback */
+button {
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+}
+
+button:after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 5px;
+    height: 5px;
+    background: rgba(255, 255, 255, 0.5);
+    opacity: 0;
+    border-radius: 100%;
+    transform: scale(1, 1) translate(-50%);
+    transform-origin: 50% 50%;
+}
+
+button:focus:not(:focus-visible) {
+    outline: none;
+}
+
+@keyframes ripple {
+    0% {
+        transform: scale(0, 0);
+        opacity: 0.5;
+    }
+    100% {
+        transform: scale(100, 100);
+        opacity: 0;
+    }
+}
+
+button:active:after {
+    animation: ripple 600ms ease-out;
+}
+
+#character-sidebar {
+    min-width: 240px;
+    max-width: 100%;
+    flex: 0 0 auto;
+    height: 100%;
+    overflow-y: auto;
+}
+
+/* Ensure header content is properly contained */
+header .container {
+    padding-left: 1rem;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    overflow: hidden; /* Prevent content from overflowing */
+}
+
+/* Fix header title size and prevent overflow */
+header h1 {
+    font-size: 1.1rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin: 0;
+    max-width: 55%; /* Limit width on larger screens */
+}
+
+/* Ensure nav buttons are properly positioned */
+header nav {
+    display: flex;
+    align-items: center;
+    height: 100%;
+}
+
+header nav button {
+    height: 32px; /* Fixed height for buttons */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: 0;
+    margin-bottom: 0;
+}
+
+@media (max-width: 640px) {
+    /* Even smaller chat header on mobile */
+    #chat-window > div:first-of-type {
+        height: 42px;
+        padding: 0 0.5rem;
+    }
+    
+    #chat-header-title {
+        font-size: 0.9rem;
+    }
+    
+    #chat-header-subtitle {
+        font-size: 0.7rem;
+    }
+    
+    /* Ensure proper spacing for chat messages with smaller header */
+    #chat-messages {
+        max-height: calc(100vh - 122px); /* Adjusted for smaller headers */
+    }
+
+    /* Make sure the chat area takes full height on mobile */
+    #chat-view {
+        height: calc(100vh - var(--header-h, 56px));
+    }
+}
+
+/* Desktop specific positioning adjustments */
+@media (min-width: 1024px) {
+    /* Remove gap on desktop between header and content */
+    #app > main {
+        padding-top: 0 !important; /* Remove padding on desktop */
+    }
+    
+    /* Fix header position on desktop */
+    #app > header {
+        position: relative !important; /* Not fixed on desktop */
+        height: auto !important;
+        min-height: auto !important;
+    }
+    
+    /* Adjust chat view height for desktop layout */
+    #chat-view {
+        height: calc(100vh - var(--header-h, 56px)) !important;
+        margin-top: 0 !important; /* Ensure no margin */
+    }
+    
+    /* Ensure character sidebar is properly positioned */
+    #character-sidebar {
+        position: relative !important;
+        top: 0 !important;
+        height: 100% !important;
+        max-height: none !important;
+        transform: none !important; /* Ensure it's visible */
+    }
+    
+    /* Fix chat window positioning */
+    #chat-window {
+        margin-top: 0;
+        border-top: none;
+    }
+    
+    /* Adjust chat header on desktop */
+    #chat-window > div:first-of-type {
+        border-top: none;
+        height: auto !important;
+        min-height: 48px;
+        padding: 0.75rem !important;
+        display: flex;
+        align-items: center;
+    }
+    
+    /* Ensure chat messages have the correct height */
+    #chat-messages {
+        max-height: calc(100vh - 164px) !important; /* Account for all headers and input area */
+    }
+    
+    /* Fix any spacing issues between main header and chat container */
+    .flex-grow {
+        margin-top: 0 !important;
+    }
+    
+    /* Remove any unwanted borders that might create visual gaps */
+    header + * {
+        border-top: none !important;
+    }
+    
+    /* Fix main container to ensure no unexpected gaps */
+    main.flex-grow {
+        display: flex;
+        flex-direction: column;
+    }
+}
+
+/* Send message button styling for all screen sizes */
+#send-message-btn {
+    width: 48px !important;
+    height: 48px !important;
+    min-width: 48px !important;
+    min-height: 48px !important;
+    max-width: 48px !important;
+    max-height: 48px !important;
+    border-radius: 50% !important;
+    padding: 0 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    flex-shrink: 0 !important;
+    margin-left: 8px !important;
+    aspect-ratio: 1/1 !important;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2) !important;
+    transition: transform 0.2s, background-color 0.2s !important;
+}
+
+/* Send button icon */
+#send-message-btn i {
+    margin: 0 auto;
+    font-size: 1.2rem;
+}
+
+/* Add hover and active states for better feedback */
+#send-message-btn:hover {
+    transform: scale(1.05);
+}
+
+#send-message-btn:active {
+    transform: scale(0.95);
+}
+
+/* Make message input more accessible on all devices */
+#message-input {
+    resize: none; /* Prevent manual resizing */
+    overflow-y: auto; /* Allow scrolling within the input */
+    padding: 10px;
+    border-radius: 20px;
+    border: 1px solid rgba(0,0,0,0.1);
+}
+
+/* Mobile specific enhancements for the send button */
+@media (max-width: 640px) {
+    #send-message-btn {
+        width: 52px !important;
+        height: 52px !important;
+        min-width: 52px !important;
+        min-height: 52px !important;
+        max-width: 52px !important;
+        max-height: 52px !important;
+        box-shadow: 0 3px 8px rgba(0, 0, 0, 0.3) !important;
+    }
+    
+    #send-message-btn i {
+        font-size: 1.4rem;
+    }
+    
+    /* Adjust input styling for mobile */
+    #message-input {
+        border-radius: 18px;
+        padding: 8px 12px;
+    }
+}
+
+/* Message input area styling */
+#chat-input-container {
+    padding: 12px !important;
+}
+
+/* Chat form layout with improved spacing */
+#chat-form {
+    display: flex;
+    align-items: flex-end;
+    gap: 8px;
+    position: relative;
+    width: 100%;
+}
+
+/* Ensure textarea takes proper space */
+#message-input {
+    flex: 1;
+    min-height: 40px;
+    padding: 10px 12px;
+    border-radius: 18px;
+    resize: none;
+    max-height: 120px;
+    overflow-y: auto;
+    line-height: 1.4;
+}
+
+/* Add this class to the chat input div via JavaScript */
+.chat-input-container {
+    background-color: white;
+    border-top: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+/* Message delete button visibility - keep hidden on desktop */
+.message-bubble .fa-times,
+button[id^="delete-msg-"] {
+    transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+/* Message editing styles */
+.message-bubble.editing {
+    width: 100%;
+    max-width: 600px;
+    padding: 16px;
+    background-color: #f8fafc;
+}
+
+.edit-message-textarea {
+    background-color: white;
+    color: #333;
+    font-family: inherit;
+    border-color: #d1d5db;
+    border-width: 1px;
+    transition: border-color 0.2s ease;
+    min-width: 280px;
+    width: 100%;
+    max-width: 600px;
+    padding: 12px;
+    line-height: 1.5;
+    border-radius: 8px;
+}
+
+.edit-message-textarea:focus {
+    outline: none;
+    border-color: #4F46E5;
+    box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.2);
+}
+
+.edit-message-textarea.border-red-500 {
+    border-color: #ef4444;
+}
+
+.edit-msg-btn {
+    opacity: 0.7;
+    transition: opacity 0.2s ease;
+}
+
+.edit-msg-btn:hover {
+    opacity: 1;
+}
+
+/* Always show edit/delete buttons on mobile */
+@media (max-width: 768px) {
+    /* Make delete buttons visible on mobile without requiring hover */
+    button[id^="delete-msg-"] {
+        display: flex !important;
+        top: -8px;
+        right: -8px;
+        width: 20px;
+        height: 20px;
+        opacity: 0.7;
+    }
+    
+    button[id^="delete-msg-"] .fa-times {
+        font-size: 0.65rem;
+    }
+    
+    /* Make edit buttons more visible on mobile */
+    .edit-msg-btn {
+        opacity: 0.7;
+        display: flex !important;
+    }
+    
+    /* Make the edit message textarea responsive on mobile */
+    .edit-message-textarea {
+        min-width: 200px;
+        max-width: 100%;
+        font-size: 0.95rem;
+        padding: 10px;
+    }
+    
+    .message-bubble.editing {
+        max-width: 100%;
+        padding: 12px;
+    }
+}
+
+/* Fix for all mobile browsers including Firefox, Brave, etc. */
+@media (max-width: 768px) {
+    /* --- CONSOLIDATED CHAT INPUT AREA STYLES --- */
+    /* Universal input container positioning for all mobile browsers */
+    #chat-input-container,
+    .chat-input-container {
+        position: fixed !important;
+        bottom: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        padding: 0.5rem !important;
+        padding-bottom: calc(0.5rem + env(safe-area-inset-bottom, 0px)) !important;
+        background-color: white !important;
+        border-top: 1px solid #e5e7eb !important;
+        width: 100% !important;
+        z-index: 100 !important;
+        box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1) !important;
+    }
+    /* --- END CONSOLIDATED CHAT INPUT AREA STYLES --- */
+    
+    /* Ensure chat messages don't get hidden behind the fixed input */
+    #chat-messages {
+        padding-bottom: calc(70px + env(safe-area-inset-bottom, 0px)) !important; /* Will be consolidated next */
+        margin-bottom: env(safe-area-inset-bottom, 0);
+        max-height: calc(100vh - 130px) !important;
+    }
+    
+    /* Class to be added when keyboard is visible - works in all browsers */
+    body.keyboard-visible #chat-input-container,
+    body.keyboard-visible .chat-input-container {
+        position: absolute; /* Change to absolute when keyboard visible */
+        bottom: 0;
+    }
+}
+
+/* Profile Picture Styles */
+#profile-picture-preview,
+#edit-profile-picture-preview {
+    position: relative;
+    transition: all 0.3s ease;
+}
+
+#profile-picture-preview.has-image,
+#edit-profile-picture-preview.has-image {
+    background-color: transparent;
+}
+
+#profile-picture-preview img,
+#edit-profile-picture-preview img {
+    border-radius: 50%;
+}
+
+.character-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    overflow: hidden;
+}
+
+.character-avatar.has-image {
+    background-color: transparent !important;
+}
+
+/* Send message container positioning */
+#chat-form {
+    position: relative;
+    z-index: 40;
+    display: flex;
+    align-items: center;
+    background-color: white;
+}
+
+/* Message input container */
+#chat-input-container {
+    padding: 0.75rem;
+}
+
+@media (max-width: 768px) {
+    /* Class to be added when keyboard is visible - works in all browsers */
+    body.keyboard-visible #chat-input-container,
+    body.keyboard-visible .chat-input-container {
+        position: absolute; /* Change to absolute when keyboard visible */
+        bottom: 0;
+    }
+    
+    /* When the sidemenu is open, ensure the message container stays on top */
+    #character-sidebar.sidebar-open + #chat-window #chat-input-container,
+    #character-sidebar.sidebar-open + #chat-window .chat-input-container {
+        z-index: 60;
+    }
+}
+
+/* Error container positioning */
+
+@keyframes slideDown {
+    from {
+        transform: translateY(-100%);
+    }
+    to {
+        transform: translateY(0);
+    }
+}
+
+/* Success message styling (similar to error container) */
+.success-message {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+    margin: 0;
+    border-radius: 0;
+    padding: 1rem;
+    background-color: #d1fae5;
+    color: #065f46;
+    text-align: center;
+    animation: slideDown 0.3s ease-out;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+@supports (padding-top: env(safe-area-inset-top)) {
+    .success-message {
+        padding-top: calc(1rem + env(safe-area-inset-top, 0px));
+    }
+}
+
+/* Prevent content selection during touch interactions on mobile */
+@media (max-width: 768px) {
+    .message-bubble, .character-item, button {
+        -webkit-touch-callout: none;
+        -webkit-user-select: none;
+        user-select: none;
+    }
+    
+    /* Allow selection in message input and other form fields */
+    input, textarea, [contenteditable="true"] {
+        -webkit-touch-callout: default;
+        -webkit-user-select: text;
+        user-select: text;
+    }
+    
+    /* Prevent elastic scrolling/bouncing effects on iOS */
+    html, body {
+        position: fixed;
+        overflow: hidden;
+        width: 100%;
+        height: 100%;
+    }
+    
+    #app {
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+        height: 100%;
+    }
+    
+    /* Ensure the correct padding with fixed header on mobile */
+    #app > main {
+        padding-top: 49px !important;
+    }
+    
+    /* Fix z-index stacking for chat window, messages, and header */
+    #chat-window {
+        position: relative;
+        z-index: 1;
+    }
+    
+    #app > header {
+        position: fixed !important;
+        top: 0;
+        left: 0;
+        right: 0;
+        z-index: 100;
+    }
+}
+
+/* Fix for modals on mobile */
+@media (max-width: 768px) {
+    #chat-history-modal > div,
+    #edit-character-modal > div {
+        max-height: 85vh;
+        width: 95%;
+        overflow-y: auto; /* Enable vertical scrolling if content overflows */
+    }
+    
+    /* Remove sidebar overlay on mobile devices */
+    .sidebar-overlay {
+        display: none !important;
+        opacity: 0 !important;
+        pointer-events: none !important;
+    }
+}
+
+/* Roleplay-specific styling for natural character interactions */
+.roleplay-action {
+    color: #6b7280;
+    font-style: italic;
+    display: inline-block;
+}
+
+.scene-transition {
+    font-weight: 500;
+    color: #4b5563;
+    text-align: center;
+    border-top: 1px solid #e5e7eb;
+    border-bottom: 1px solid #e5e7eb;
+    padding: 0.5rem 0;
+    margin: 0.75rem 0;
+    font-size: 0.9rem;
+    background-color: #f9fafb;
+}
+
+.ooc-comment {
+    opacity: 0.7;
+    font-size: 0.9em;
+    color: #6b7280;
+    font-style: italic;
+    display: inline-block;
+}
+
+/* Character typing indicator enhancements */
+.typing-indicator {
+    display: flex;
+    background-color: #f3f4f6;
+    padding: 0.5rem 1rem;
+    border-radius: 1rem;
+    margin-top: 0.25rem;
+    max-width: 5rem;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Improved continue indicator */
+.system-continue-indicator {
+    font-size: 0.8rem;
+    color: #6b7280;
+    text-align: center;
+    opacity: 0.7;
+    margin: 0.5rem 0;
+    animation: fadeInOut 1.5s ease-in-out;
+}
+
+@keyframes fadeInOut {
+    0% { opacity: 0; }
+    50% { opacity: 0.7; }
+    100% { opacity: 0; }
+}
+
+/* Enhance character and user message distinction */
+.user-message {
+    background-color: #3b82f6;
+    color: white;
+}
+
+.character-message {
+    background-color: #f3f4f6;
+    color: #111827;
+}
+
+/* Improve natural conversation flow with message spacing */
+.message-container-character + .message-container-character,
+.message-container-user + .message-container-user {
+    margin-top: 0.25rem;
+}
+
+.message-container-character + .message-container-user,
+.message-container-user + .message-container-character {
+    margin-top: 1rem;
+}
+
+/* Character avatar enhancements */
+.character-avatar {
+    transition: transform 0.2s ease;
+}
+
+.character-avatar:hover {
+    transform: scale(1.05);
+}
+
+.typing-indicator-bubble {
+    position: relative;
+}
+
+.typing-indicator {
+    display: flex;
+    background-color: #f3f4f6;
+    padding: 0.5rem 1rem;
+    border-radius: 1rem;
+    margin-top: 0.25rem;
+    max-width: 5rem;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Mobile styling for typing indicator delete buttons */
+@media (max-width: 768px) {
+    .typing-indicator-bubble button[id^="delete-msg-"] {
+        display: flex !important;
+        top: -8px;
+        right: -8px;
+        z-index: 10;
+    }
+    
+    /* Enhanced mobile visibility for stuck typing indicators */
+    .typing-indicator-bubble {
+        padding-right: 8px;
+    }
+}
+
+/* --- Mobile Button Layout for Edit/Regenerate --- */
+@media (max-width: 768px) {
+    .message-container-user .text-xs.text-gray-500.mt-1,
+    .message-container-character .text-xs.text-gray-500.mt-1 {
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        justify-content: flex-start; /* Align items to the start of the container */
+        flex-wrap: nowrap; 
+    }
+
+    /* Ensure the timestamp text itself doesn't push buttons too far */
+    .message-container-user .text-xs.text-gray-500.mt-1 > span:first-child,
+    .message-container-character .text-xs.text-gray-500.mt-1 > span:first-child {
+        margin-right: 0.5rem; /* Space between time and first button */
+        white-space: nowrap;
+        flex-shrink: 0; /* Prevent time from shrinking too much */
+    }
+
+    /* Styling for the buttons themselves on mobile for better side-by-side layout */
+    .message-container-user .text-xs.text-gray-500.mt-1 .edit-msg-btn,
+    .message-container-character .text-xs.text-gray-500.mt-1 .edit-msg-btn {
+        margin-left: 0.35rem; /* Consistent small margin between buttons */
+        padding: 0.2rem 0.3rem; 
+        font-size: 0.65rem; /* Smaller font for button text like 'Edit' or 'Regenerate' */
+        line-height: 1;
+        display: inline-flex; /* Ensure they behave well in a flex row */
+        align-items: center;
+    }
+
+    /* Adjust icon size and spacing within buttons */
+    .message-container-user .text-xs.text-gray-500.mt-1 .edit-msg-btn .fas,
+    .message-container-character .text-xs.text-gray-500.mt-1 .edit-msg-btn .fas {
+        font-size: 0.7rem; 
+        margin-right: 0.15rem; /* Space between icon and text, if text exists */
+    }
+
+    /* If only icon (common for user message edit button) */
+    .message-container-user .text-xs.text-gray-500.mt-1 .edit-msg-btn .fas:only-child {
+        margin-right: 0; 
+    }
+
+    /* Text within buttons (like "Regenerate", "Edit") */
+    .message-container-character .text-xs.text-gray-500.mt-1 .edit-msg-btn .text-xs {
+        font-size: 0.65rem; /* Match button font size */
+        display: inline; /* Ensure it stays inline with icon */
+    }
+}
+/* --- End Mobile Button Layout --- */
+
+/* Visible response status while the model is preparing or thinking */
+.typing-indicator-bubble {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    min-height: 2.75rem;
+    max-width: min(26rem, 85vw);
+    padding: 0.7rem 1rem;
+}
+
+.typing-status-text {
+    min-width: 0;
+    color: #4b5563;
+    font-size: 0.875rem;
+    line-height: 1.35;
+    white-space: normal;
+}
+
+.typing-indicator-bubble .typing-indicator {
+    flex-shrink: 0;
+    width: auto;
+    max-width: none;
+    margin: 0;
+    padding: 0;
+    background: transparent;
+    border-radius: 0;
+}
+
+@media (max-width: 768px) {
+    .typing-indicator-bubble {
+        max-width: calc(100vw - 5rem);
+        align-items: flex-start;
+        gap: 0.5rem;
+    }
+
+    .typing-status-text {
+        font-size: 0.8rem;
+    }
+
+    #chat-input-container {
+        min-height: calc(64px + env(safe-area-inset-bottom, 0px));
+    }
+}
+
+
+/* Hiding the character list on a wide screen.
+   Only applies above the mobile breakpoint, so the phone layout, where the list is the
+   main screen and tapping a name opens the chat, is left exactly as it was. */
+@media (min-width: 769px) {
+    #character-sidebar {
+        transition: width 0.25s ease, opacity 0.2s ease;
+        overflow: hidden;
+    }
+
+    /* Written with !important on purpose. The sidebar has several width and min-width
+       rules elsewhere, some of them already using !important, and collapsing it has to
+       beat all of them or the button appears to do nothing. */
+    body.sidebar-hidden #character-sidebar {
+        width: 0 !important;
+        min-width: 0 !important;
+        max-width: 0 !important;
+        opacity: 0;
+        border-right: none !important;
+        pointer-events: none;
+    }
+
+    /* Both controls are shown from here, at id strength, because relying on utility
+       classes for this was not reliably winning and the hide control never appeared. */
+    #hide-sidebar-btn { display: inline-flex !important; }
+    body.sidebar-hidden #hide-sidebar-btn { display: none !important; }
+    /* The arrow in the chat header is gone for good. There is one control for this and it
+       lives in the main header, which is on screen in every state. Showing both was why two
+       arrows appeared once the list was hidden: this rule was more specific than the one
+       hiding it, so it won. */
+}
+
+/* On a phone this control has no job, since the list is the screen. */
+@media (max-width: 768px) {
+    #hide-sidebar-btn,
+    #reveal-sidebar-btn { display: none !important; }
+}
+
+/* ---------------------------------------------------------------------------
+   The sliding navigation.
+
+   A pill sits behind whichever section is current. Tapping a section slides it
+   there, and it can also be dragged and let go, settling on whichever section is
+   nearest.
+
+   The colours are the app's own. The design this was modelled on used a green pill
+   on white, but the header here is indigo with a white active button already, so a
+   white pill on indigo is the same idea in the existing palette rather than a new
+   colour dropped in.
+
+   Two things carry the feel. There is no transition while dragging, so the pill sits
+   exactly under your finger, and the curve it settles with overshoots a little, which
+   reads as a physical thing coming to rest instead of a box being moved.
+   --------------------------------------------------------------------------- */
+
+.seg-nav {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    padding: 3px;
+    border-radius: 9999px;
+    background: rgba(255, 255, 255, 0.16);
+    /* Stops a drag on the pill from scrolling the page on a touch screen. */
+    touch-action: pan-y;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+.seg-pill {
+    position: absolute;
+    top: 3px;
+    bottom: 3px;
+    left: 0;
+    width: 0;
+    border-radius: 9999px;
+    background: #ffffff;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
+    /* Settling curve. The slight overshoot is the point. */
+    transition: transform 0.42s cubic-bezier(0.34, 1.42, 0.64, 1),
+                width 0.42s cubic-bezier(0.34, 1.42, 0.64, 1);
+    will-change: transform, width;
+    pointer-events: none;
+    z-index: 0;
+}
+
+/* While a finger or pointer is down, the pill must not animate at all. Any easing
+   here reads as the interface lagging behind you. */
+.seg-nav.is-dragging .seg-pill {
+    transition: none;
+}
+
+/* A small squash while being dragged, which is what makes it feel held rather than
+   teleported. */
+.seg-nav.is-dragging .seg-pill {
+    transform-origin: center;
+}
+
+.seg-item {
+    position: relative;
+    z-index: 1;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 12px;
+    border: 0;
+    background: transparent;
+    border-radius: 9999px;
+    font: inherit;
+    font-size: 0.86rem;
+    font-weight: 500;
+    line-height: 1.2;
+    color: rgba(255, 255, 255, 0.82);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: color 0.2s ease;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.seg-item:hover {
+    color: #ffffff;
+}
+
+/* The current section. Set from script as the pill passes over it, so during a drag
+   the label under the pill is always the readable one. */
+.seg-item.is-active,
+.seg-item.is-active:hover {
+    color: var(--color-primary, #4F46E5);
+}
+
+.seg-item:focus-visible {
+    outline: 2px solid rgba(255, 255, 255, 0.9);
+    outline-offset: 2px;
+}
+
+.seg-item i {
+    font-size: 0.9em;
+}
+
+.seg-warning {
+    margin-left: 2px;
+    color: #ef4444;
+    font-weight: 700;
+}
+
+/* On a narrow screen the labels are dropped and the icons carry it, so the pill still
+   fits alongside the app name. */
+@media (max-width: 560px) {
+    .seg-label { display: none; }
+    .seg-nav { padding: 3px; gap: 2px; }
+    .seg-pill { top: 3px; bottom: 3px; }
+    .seg-item { width: 2.7rem; height: 2.15rem; padding: 0; justify-content: center; }
+    .seg-item i { font-size: 0.95em; }
+}
+
+/* Anyone who has asked for less movement gets the colour change and no sliding. */
+@media (prefers-reduced-motion: reduce) {
+    .seg-pill { transition: none; }
+}
+
+/* A failure shown inside the conversation.
+   Deliberately not a rounded pill like the neutral notices, so it does not read as an
+   ordinary system message. */
+.chat-error-bubble {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    max-width: 90%;
+    padding: 10px 14px;
+    border-radius: 14px;
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    color: #991b1b;
+    font-size: 0.85rem;
+    line-height: 1.45;
+    text-align: left;
+}
+
+.chat-error-bubble i {
+    margin-top: 2px;
+    flex-shrink: 0;
+}
+
+/* The error banner must always be reachable.
+   It used to sit in the normal flow, where a taller header or a fixed height container
+   could push it out of sight, which is how a failure ended up showing nothing at all. */
+
+
+/* The control that brings the character list back.
+   It lives in the main header because that is always on screen. The one in the chat
+   header only exists while a chat is open, and hiding the list leaves you with no chat
+   open, so that was a one way door. */
+#reveal-sidebar-main { display: none; }
+body.sidebar-hidden #reveal-sidebar-main { display: inline-flex; }
+
+/* On a phone the list is the screen, so neither control has a job there. */
+@media (max-width: 768px) {
+    #reveal-sidebar-main { display: none !important; }
+}
+
+/* The navigation on a narrow screen.
+   Icons only, evenly sized, so the strip reads as three equal buttons rather than three
+   different shapes squeezed together. */
+@media (max-width: 560px) {
+    .seg-nav { gap: 0; padding: 2px; }
+    .seg-item {
+        width: 40px;
+        height: 32px;
+        padding: 0;
+        justify-content: center;
+    }
+    .seg-item i { font-size: 0.95em; margin: 0; }
+    .seg-warning {
+        position: absolute;
+        top: 1px;
+        right: 6px;
+        margin: 0;
+        font-size: 0.85em;
+        line-height: 1;
+    }
+}
+
+/* The home screen sits inside a container that does not scroll, so it needs its own. */
+#chat-home {
+    -webkit-overflow-scrolling: touch;
+}
+
+
+/* The backup reminder, same reasoning as the error banner. It floats rather than pushing
+   the page down. */
+#backup-reminder {
+    position: fixed;
+    left: 50%;
+    transform: translateX(-50%);
+    top: calc(var(--header-h, 56px) + 0.5rem);
+    width: min(48rem, calc(100% - 2rem));
+    z-index: 75;
+    margin: 0;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+/* Only one control for bringing the list back should ever be on screen.
+   Both were showing at once when a chat was open, which is why there were two arrows in
+   the header. The one in the main header is the only one kept, since it is present in
+   every state including when no chat is open. */
+#reveal-sidebar-btn { display: none !important; }
+
+/* ---------------------------------------------------------------------------
+   Notifications.
+
+   Small cards that appear over the page, stack, and take themselves away. Modelled
+   on how a phone does it: rounded, softly shadowed, slightly translucent, arriving
+   with a little movement rather than simply appearing.
+
+   The old version was a banner in the page flow that grew to whatever size the text
+   needed. A provider error filled the screen, gained a scrollbar, and you had to
+   scroll inside it to reach the dismiss button.
+   --------------------------------------------------------------------------- */
+
+#toast-stack {
+    position: fixed;
+    top: calc(var(--header-h, 56px) + 0.75rem);
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 200;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    width: min(26rem, calc(100% - 1.5rem));
+    pointer-events: none;
+}
+
+.toast {
+    pointer-events: auto;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.85rem 1rem 0.85rem 1.1rem;
+    border-radius: 1.25rem;
+    /* Glass, but readable first. The blur is heavier and the surface lighter than before,
+       and there is a white layer underneath so text never sits directly on whatever is
+       behind it. */
+    background: linear-gradient(rgba(255, 255, 255, 0.82), rgba(255, 255, 255, 0.74));
+    backdrop-filter: saturate(160%) blur(26px);
+    -webkit-backdrop-filter: saturate(160%) blur(26px);
+    border: 1px solid rgba(255, 255, 255, 0.7);
+    box-shadow:
+        0 16px 40px rgba(15, 23, 42, 0.14),
+        0 2px 8px rgba(15, 23, 42, 0.06),
+        inset 0 1px 0 rgba(255, 255, 255, 0.8);
+    cursor: pointer;
+    animation: toast-in 0.42s cubic-bezier(0.22, 1.2, 0.4, 1) both;
+    will-change: transform, opacity;
+}
+
+/* Where the blur is not supported, fall back to something solid rather than something
+   unreadable. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    .toast { background: #ffffff; }
+}
+
+/* Arrives from above with a slight overshoot, the way a notification drops in. */
+@keyframes toast-in {
+    from { opacity: 0; transform: translateY(-14px) scale(0.96); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.toast-leaving {
+    animation: toast-out 0.22s ease forwards;
+}
+
+@keyframes toast-out {
+    to { opacity: 0; transform: translateY(-10px) scale(0.97); }
+}
+
+.toast-icon {
+    font-size: 1.05rem;
+    margin-top: 0.1rem;
+    flex-shrink: 0;
+}
+
+.toast-error .toast-icon { color: #ef4444; }
+.toast-success .toast-icon { color: #10b981; }
+.toast-warning .toast-icon { color: #f59e0b; }
+.toast-info .toast-icon { color: var(--color-primary, #4F46E5); }
+
+/* A hairline of colour down the leading edge, so the kind reads at a glance. */
+.toast-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.75rem;
+    height: 1.75rem;
+    border-radius: 999px;
+    margin-top: 0;
+}
+
+.toast-error .toast-icon { background: rgba(239, 68, 68, 0.12); }
+.toast-success .toast-icon { background: rgba(16, 185, 129, 0.14); }
+.toast-warning .toast-icon { background: rgba(245, 158, 11, 0.14); }
+.toast-info .toast-icon { background: rgba(79, 70, 229, 0.12); }
+
+.toast::before {
+    content: none;
+}
+.toast { position: relative; overflow: hidden; }
+.toast-error::before { background: #ef4444; }
+.toast-success::before { background: #10b981; }
+.toast-warning::before { background: #f59e0b; }
+.toast-info::before { background: var(--color-primary, #4F46E5); }
+
+.toast-body { min-width: 0; flex-grow: 1; }
+
+.toast-title {
+    margin: 0 0 0.1rem;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: #111827;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.toast-count {
+    font-size: 0.68rem;
+    font-weight: 600;
+    color: #6b7280;
+    background: rgba(0, 0, 0, 0.06);
+    border-radius: 999px;
+    padding: 0.05rem 0.4rem;
+}
+
+.toast-message {
+    margin: 0;
+    font-size: 0.84rem;
+    line-height: 1.4;
+    color: #1f2937;
+    /* Never tall enough to need scrolling. The text is shortened before it gets here,
+       and this is the second line of defence. */
+    display: -webkit-box;
+    -webkit-line-clamp: 4;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.toast-more {
+    display: block;
+    margin-top: 0.3rem;
+    font-size: 0.72rem;
+    color: #6b7280;
+}
+
+.toast-close {
+    flex-shrink: 0;
+    width: 1.4rem;
+    height: 1.4rem;
+    border: 0;
+    border-radius: 999px;
+    background: rgba(0, 0, 0, 0.05);
+    color: #6b7280;
+    font-size: 0.7rem;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+
+.toast-close:hover {
+    background: rgba(0, 0, 0, 0.1);
+    color: #111827;
+}
+
+@media (max-width: 560px) {
+    #toast-stack { top: calc(var(--header-h, 56px) + 0.5rem); }
+    .toast { padding: 0.7rem 0.8rem; border-radius: 1rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .toast, .toast-leaving { animation: none; }
+}
+
+/* ---------------------------------------------------------------------------
+   Movement elsewhere, so the app feels responsive rather than static.
+   All of it is short, and all of it is switched off for anyone who has asked for
+   less movement.
+   --------------------------------------------------------------------------- */
+
+/* Cards on the home screen settle in rather than appearing all at once. */
+@keyframes card-in {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+#home-recent > button,
+#home-all > button {
+    animation: card-in 0.3s ease both;
+}
+
+/* A short stagger, so a grid of cards arrives as a wave rather than a block. */
+#home-all > button:nth-child(1) { animation-delay: 0.02s; }
+#home-all > button:nth-child(2) { animation-delay: 0.04s; }
+#home-all > button:nth-child(3) { animation-delay: 0.06s; }
+#home-all > button:nth-child(4) { animation-delay: 0.08s; }
+#home-all > button:nth-child(5) { animation-delay: 0.10s; }
+#home-all > button:nth-child(6) { animation-delay: 0.12s; }
+#home-all > button:nth-child(n+7) { animation-delay: 0.14s; }
+
+#home-recent > button,
+#home-all > button {
+    transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+
+#home-recent > button:hover,
+#home-all > button:hover {
+    transform: translateY(-2px);
+}
+
+#home-recent > button:active,
+#home-all > button:active {
+    transform: translateY(0) scale(0.99);
+}
+
+/* New messages rise into place. */
+@keyframes message-in {
+    from { opacity: 0; transform: translateY(6px) scale(0.99); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.message-bubble.new-message {
+    animation: message-in 0.26s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Rows in the list respond to a press. */
+.character-item {
+    transition: background-color 0.15s ease;
+}
+/* No movement on press here. Scaling the row shifted what was under the finger, so a tap
+   could land on a neighbour and it felt like it had missed. The background change is
+   feedback enough. */
+.character-item:active {
+    background-color: rgba(79, 70, 229, 0.08);
+}
+
+/* Views fade in when switched. */
+@keyframes view-in {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+
+#chat-view:not(.hidden),
+#characters-view:not(.hidden),
+#settings-view:not(.hidden) {
+    animation: view-in 0.2s ease both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    #home-recent > button,
+    #home-all > button,
+    .message-bubble.new-message,
+    #chat-view:not(.hidden),
+    #characters-view:not(.hidden),
+    #settings-view:not(.hidden) { animation: none; }
+}
+
+/* ---------------------------------------------------------------------------
+   Settings and Characters as a board rather than a column.
+
+   Both pages used to be a single narrow column, so on a wide screen you scrolled
+   past a lot of empty space to reach anything. They are now a grid of cards that
+   fills the width, so most of it is visible at once. On a phone the grid collapses
+   to one column, which is the right shape there.
+   --------------------------------------------------------------------------- */
+
+/* Cards flow into columns and pack against each other, so there are no gaps.
+   
+   A grid was the wrong tool here. With items aligned to the start, a short card beside a
+   tall one left a hole underneath it. With them stretched, the short card grew and the hole
+   moved inside the card instead, which is what left all that empty space under the provider
+   list. Columns let each card take the height it needs and let the next one start
+   immediately below, so the space fills itself. */
+/* A real grid rather than flowing columns.
+   
+   Columns were the right answer while there were eight cards of wildly different heights,
+   because they packed without leaving a hole. But packing can never line rows up, so the
+   bottoms were always ragged.
+   
+   Now that related settings have been merged into six cards of similar weight, a grid gives
+   what packing could not: every card in a row starts and ends at the same place. That is what
+   symmetry actually requires. */
+.settings-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr));
+    gap: 1.1rem;
+    align-items: stretch;
+}
+
+.settings-grid > .settings-card {
+    margin: 0;
+}
+
+.settings-card {
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 1rem;
+    padding: 1.4rem;
+    box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
+    /* A card is never split across a column break. */
+    break-inside: avoid-column;
+    page-break-inside: avoid;
+    transition: box-shadow 0.18s ease, border-color 0.18s ease;
+    /* A column, so the last thing in a card can be pushed to the bottom and the buttons across
+       a row line up with each other. */
+    display: flex;
+    flex-direction: column;
+}
+
+/* The last button in a card sits at the bottom. */
+.settings-card > button:last-child,
+.settings-card > .flex:last-child {
+    margin-top: auto;
+}
+
+/* One consistent rhythm inside every card, set with margins rather than a flex gap, because
+   a card has to be a block for the columns above to flow it. */
+.settings-card > * + * {
+    margin-top: 0.7rem;
+}
+
+/* One heading style, one size, one spacing, everywhere. */
+.settings-card > h3 {
+    font-size: 1.02rem;
+    font-weight: 600;
+    color: #111827;
+    margin: 0 0 0.15rem;
+    padding-bottom: 0.6rem;
+    border-bottom: 1px solid #f1f2f4;
+}
+
+/* Explanatory text under a heading is the same size and colour throughout. */
+.settings-card > p {
+    font-size: 0.85rem;
+    line-height: 1.5;
+    color: #6b7280;
+    margin: 0 0 0.2rem;
+}
+
+/* Labels and fields line up the same way in every card. */
+.settings-card label {
+    font-size: 0.85rem;
+    color: #374151;
+}
+
+.settings-card input[type="text"],
+.settings-card input[type="url"],
+.settings-card input[type="number"],
+.settings-card input[type="password"],
+.settings-card input[type="search"],
+.settings-card select,
+.settings-card textarea {
+    font-size: 0.9rem;
+    border-radius: 0.6rem;
+    border-color: #e5e7eb;
+}
+
+/* Buttons the same height and shape in every card. */
+.settings-card button:not(.toast-close) {
+    border-radius: 0.6rem;
+}
+
+.settings-card:hover {
+    box-shadow: 0 4px 14px rgba(16, 24, 40, 0.07);
+}
+
+/* The border and spacing the sections used to carry are the card's job now. */
+.settings-card > h3 {
+    margin-top: 0;
+}
+
+/* The column count is expressed as a width rather than a number, so it follows the space
+   available. At a given width the browser fits as many as it can, which means the page works
+   at any size instead of only at the three sizes that were listed before. */
+/* A divider inside a card, where two related groups sit together. */
+.settings-divider {
+    border: 0;
+    border-top: 1px solid #f1f2f4;
+    margin: 1rem 0;
+}
+
+/* The two long cards are moved out of the columns and given the full width underneath, since
+   a numbered list and a log both read badly in a narrow column. */
+.settings-wide {
+    margin-bottom: 1.1rem;
+    display: block;
+}
+
+/* Characters, same idea. */
+/* The number of columns follows the width the grid actually has, rather than the width of
+   the window.
+   
+   This is what went wrong. The counts were set from viewport breakpoints, but the grid sits
+   inside a panel taking half the page, so at three columns each card came out about 183
+   pixels wide against 126 pixels of avatar, buttons and gaps. That left roughly 25 pixels
+   for the name, which is why every name was cut down to a single letter.
+   
+   With auto-fill and a minimum, the grid works out for itself how many will fit. */
+.character-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(15.5rem, 1fr));
+    gap: 1rem;
+    align-items: start;
+}
+
+.character-grid > div {
+    animation: card-in 0.3s ease both;
+}
+
+/* ---------------------------------------------------------------------------
+   The show and hide controls for the classic list.
+
+   The arrow was appearing in the header on every page, including Characters and
+   Settings where there is no list to show, which made no sense. It is now only
+   present while the chat page is open.
+   --------------------------------------------------------------------------- */
+
+#reveal-sidebar-main { display: none !important; }
+
+body.chat-view-active.sidebar-hidden #reveal-sidebar-main {
+    display: inline-flex !important;
+}
+
+@media (max-width: 768px) {
+    #reveal-sidebar-main { display: none !important; }
+}
+
+/* ---------------------------------------------------------------------------
+   The two chat layouts.
+
+   Modern hides the list down the side and uses the board as the way in. Classic keeps
+   the list, which is how the app has always looked.
+
+   On a phone neither applies: the list is the screen and tapping a name opens the
+   chat, which works well and is left alone.
+   --------------------------------------------------------------------------- */
+
+@media (min-width: 769px) {
+    /* Modern: the board is the navigation, so the side list is not shown and cannot be
+       hidden, because hiding it would leave nothing to navigate with. */
+    body.layout-modern #character-sidebar,
+    html.layout-modern #character-sidebar {
+        display: none !important;
+    }
+    body.layout-modern #hide-sidebar-btn,
+    body.layout-modern #reveal-sidebar-main,
+    html.layout-modern #hide-sidebar-btn,
+    html.layout-modern #reveal-sidebar-main {
+        display: none !important;
+    }
+
+    /* In modern, the way back to the board is the arrow in the chat header. */
+    body.layout-modern #back-to-home-btn,
+    html.layout-modern #back-to-home-btn {
+        display: inline-flex !important;
+    }
+
+    /* Classic keeps the list, and the arrow only when the list is hidden and the chat page
+       is open. */
+    body.layout-classic #back-to-home-btn,
+    html.layout-classic #back-to-home-btn {
+        display: none !important;
+    }
+}
+
+/* On a phone the board is reachable through the list, so the extra control is not needed. */
+@media (max-width: 768px) {
+    #back-to-home-btn { display: none !important; }
+}
+
+/* ---------------------------------------------------------------------------
+   The list on a phone.
+
+   Rows a comfortable size for a thumb, a search box that lines up with them, and no
+   controls that do nothing there.
+   --------------------------------------------------------------------------- */
+
+@media (max-width: 768px) {
+    #sidebar-search {
+        font-size: 1rem;      /* stops iOS zooming in when it gains focus */
+        padding-top: 0.7rem;
+        padding-bottom: 0.7rem;
+    }
+
+    #sidebar-characters .character-item {
+        padding: 0.85rem 1rem;
+        border-radius: 0;
+    }
+
+    /* A hairline between rows rather than a card each, which reads better as a list. */
+    #sidebar-characters .character-item {
+        border: 0;
+        border-bottom: 1px solid #f1f2f4;
+        margin-bottom: 0;
+    }
+
+    /* The heading and search sit together as one block at the top. */
+    #character-sidebar > div:first-child {
+        padding-bottom: 0.35rem;
+    }
+}
+
+/* The board on a phone: one column, comfortable spacing, and the search box big enough
+   to hit. */
+@media (max-width: 640px) {
+    #chat-home .max-w-4xl { padding-left: 1rem; padding-right: 1rem; }
+    #home-search { font-size: 1rem; }
+    #home-recent, #home-all { grid-template-columns: 1fr !important; }
+}
+
+/* ---------------------------------------------------------------------------
+   Accessibility.
+   --------------------------------------------------------------------------- */
+
+/* Every control shows where the keyboard is. */
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[role="tab"]:focus-visible {
+    outline: 2px solid var(--color-primary, #4F46E5);
+    outline-offset: 2px;
+    border-radius: 0.35rem;
+}
+
+/* Nothing relies on colour alone. Failures carry an icon, and the log marks them in text. */
+.toast-error .toast-icon,
+.chat-error-bubble i {
+    /* Kept for clarity: the icon is the signal, the colour is reinforcement. */
+    opacity: 1;
+}
+
+/* Comfortable targets on touch screens.
+   Deliberately not applied to every button. Doing that inflated the small round controls
+   on a message into large blobs, because they are meant to be 24 pixels across. Only the
+   things you navigate with get the larger target. */
+@media (pointer: coarse) {
+    .character-item,
+    [role="tab"],
+    #send-message-btn,
+    .settings-card button:not(.icon-button),
+    #home-all button,
+    #home-recent button {
+        min-height: 44px;
+    }
+
+    /* The small round controls keep their size and gain a little breathing room instead. */
+    button[id^="delete-msg-"] {
+        width: 1.6rem !important;
+        height: 1.6rem !important;
+        min-height: 0 !important;
+        font-size: 0.7rem;
+    }
+}
+
+/* And the same size everywhere else, so they never grow. */
+button[id^="delete-msg-"] {
+    width: 1.5rem;
+    height: 1.5rem;
+    min-height: 0;
+    padding: 0;
+    line-height: 1;
+    font-size: 0.65rem;
+}
+
+
+/* ---------------------------------------------------------------------------
+   Character cards.
+
+   Written against the markup in characterCardHTML rather than guessing at classes
+   produced elsewhere, which is why the controls kept ending up in the wrong place.
+
+   The important rule is the minimum width on the name. Without it a long name cannot
+   shrink, so it pushes the edit and delete controls out past the edge of the card.
+   --------------------------------------------------------------------------- */
+
+.char-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+    background: #ffffff;
+    border: 1px solid #e8eaed;
+    border-radius: 0.9rem;
+    padding: 1rem 1.1rem 1.1rem;
+    box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
+    transition: box-shadow 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
+    /* Natural height. Stretching to match the tallest card in the row put a large empty
+       space inside the short ones, which is what looked unfinished. */
+    min-width: 0;
+}
+
+.char-card:hover {
+    box-shadow: 0 6px 18px rgba(16, 24, 40, 0.08);
+    border-color: rgba(79, 70, 229, 0.28);
+}
+
+/* Three explicit columns: the avatar, the name, the controls.
+   
+   This was a flex box containing another flex box, which is what kept breaking at narrow
+   widths. A grid with a fixed column at each end and a flexible one in the middle cannot
+   overlap and cannot push anything outside the card, however narrow it gets. The middle
+   column is minmax(0, 1fr), and the zero is what allows the name to shrink. */
+.char-card-top {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 0.6rem;
+}
+
+.char-avatar {
+    width: 2.4rem;
+    height: 2.4rem;
+    border-radius: 999px;
+    object-fit: cover;
+    flex-shrink: 0;
+}
+
+.char-avatar-letter {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(79, 70, 229, 0.12);
+    color: var(--color-primary, #4F46E5);
+    font-weight: 600;
+    font-size: 0.95rem;
+}
+
+.char-card-name {
+    margin: 0;
+    font-size: 0.98rem;
+    font-weight: 600;
+    color: #111827;
+    /* One line, shortened with an ellipsis, so the row height never varies. */
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+/* The middle column can be genuinely narrow on a small screen, so the name is allowed to be
+   very short rather than forcing the row wider. */
+@media (max-width: 420px) {
+    .char-card-name { font-size: 0.92rem; }
+    .char-icon-btn { width: 1.85rem; height: 1.85rem; }
+    .char-avatar { width: 2.1rem; height: 2.1rem; }
+}
+
+.char-card-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    /* Its own grid column, so it always has room and never overlaps the name. */
+    justify-self: end;
+}
+
+.char-icon-btn {
+    width: 2rem;
+    height: 2rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    border-radius: 0.55rem;
+    background: #f4f5f7;
+    color: #6b7280;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+
+.char-icon-edit:hover { background: rgba(79, 70, 229, 0.12); color: var(--color-primary, #4F46E5); }
+.char-icon-delete:hover { background: rgba(239, 68, 68, 0.12); color: #dc2626; }
+
+.char-card-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    min-width: 0;
+}
+
+.char-card-label {
+    margin: 0;
+    font-size: 0.68rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #9ca3af;
+}
+
+.char-card-text {
+    font-size: 0.83rem;
+    line-height: 1.5;
+    color: #4b5563;
+    background: #fafbfc;
+    border: 1px solid #eef0f3;
+    border-radius: 0.55rem;
+    padding: 0.55rem 0.65rem;
+    /* A fixed height, so every card in a row is the same size regardless of how much has
+       been written. Scrolls inside itself if there is more. */
+    height: 4.5rem;
+    overflow-y: auto;
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
+}
+
+.char-card-text-tall {
+    height: 6.5rem;
+}
+
+.char-card-empty {
+    color: #9ca3af;
+    font-style: italic;
+}
+
+/* The action sits at the bottom, so buttons line up across a row even when the cards above
+   them hold different amounts. */
+.char-card-foot {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-top: auto;
+    padding-top: 0.1rem;
+}
+
+/* Says a fuller profile exists without printing the whole thing, so every card in the grid
+   is the same height. */
+/* Always present, so every card is the same height. It used to appear only on cards that had a
+   profile, which made those cards one line taller than the rest. */
+.char-card-badge {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    margin: 0;
+    font-size: 0.7rem;
+    font-weight: 600;
+    line-height: 1.2;
+    min-height: 1rem;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.char-card-badge.is-built { color: #059669; }
+.char-card-badge.is-plain { color: #9ca3af; font-weight: 500; }
+
+.char-enhance-btn {
+    width: 100%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.45rem;
+    padding: 0.55rem 0.8rem;
+    border: 0;
+    border-radius: 0.6rem;
+    background: rgba(147, 51, 234, 0.1);
+    color: #7e22ce;
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s ease;
+}
+
+.char-enhance-btn:hover {
+    background: rgba(147, 51, 234, 0.18);
+}
+
+.character-grid > .char-card {
+    animation: card-in 0.3s ease both;
+}
+
+/* ---------------------------------------------------------------------------
+   The header on a phone.
+
+   The navigation pill was overflowing the bar. The bar had a fixed height of 46 pixels
+   set with an important flag, and the pill plus its padding came to more than that, so
+   it hung out of the bottom. The bar sizes to its contents now, with a floor rather
+   than a fixed height.
+   --------------------------------------------------------------------------- */
+
+@media (max-width: 768px) {
+    #app > header {
+        height: auto !important;
+        min-height: 0 !important;
+        padding: 0.4rem 0.6rem !important;
+        display: flex !important;
+        align-items: center !important;
+    }
+
+    header > div {
+        width: 100%;
+        gap: 0.5rem;
+    }
+
+    /* Room around each icon, so the three do not look crammed together. */
+    .seg-nav {
+        padding: 3px;
+        gap: 2px;
+        flex-shrink: 0;
+    }
+
+    .seg-item {
+        width: 2.7rem;
+        height: 2.15rem;
+        padding: 0;
+    }
+
+    .seg-item i { font-size: 0.95em; }
+
+    .seg-pill { top: 3px; bottom: 3px; }
+
+    /* The name can shrink so the pill always fits. */
+    header h1 {
+        min-width: 0;
+        font-size: 1.05rem;
+    }
+    header h1 #app-name {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+}
+
+/* ---------------------------------------------------------------------------
+   The list on a phone.
+
+   The heading and the search box are one block with one background, so the search no
+   longer looks as though it is sliding underneath the bar above it.
+   --------------------------------------------------------------------------- */
+
+@media (max-width: 768px) {
+    /* The heading row loses its own bottom border, since the block below continues it. */
+    #character-sidebar > div:first-child {
+        border-bottom: 0 !important;
+        padding: 0.9rem 1rem 0.5rem !important;
+    }
+
+    /* The search sits in the same white block, with a single border underneath both. */
+    #character-sidebar > div:nth-child(2) {
+        padding: 0 1rem 0.75rem !important;
+        border-bottom: 1px solid #eceef1;
+        background: #ffffff;
+    }
+
+    #sidebar-search {
+        height: 2.6rem;
+        border-radius: 0.75rem;
+        background: #f2f3f5;
+    }
+
+    /* The rows start immediately below, with no gap that could look like a seam. */
+    #sidebar-characters {
+        padding-top: 0 !important;
+    }
+}
+
+/* Desktop gets the same treatment, for consistency. */
+@media (min-width: 769px) {
+    #character-sidebar > div:first-child {
+        border-bottom: 0;
+        padding-bottom: 0.5rem;
+    }
+    #character-sidebar > div:nth-child(2) {
+        border-bottom: 1px solid #eceef1;
+        padding-bottom: 0.75rem;
+    }
+}
+
+
+/* ---------------------------------------------------------------------------
+   The characters page.
+
+   The form takes the width it needs and the list takes the rest, instead of the two
+   splitting the page evenly and leaving the list too narrow for its own cards.
+   --------------------------------------------------------------------------- */
+
+.characters-layout {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1.25rem;
+    align-items: start;
+}
+
+@media (min-width: 1000px) {
+    .characters-layout {
+        /* A comfortable column for the form, everything else for the list. */
+        grid-template-columns: 22rem minmax(0, 1fr);
+    }
+
+    /* The form stays in view while the list scrolls past it. */
+    .characters-layout > div:first-child {
+        position: sticky;
+        top: calc(var(--header-h, 56px) + 1.25rem);
+    }
+}
+
+/* ---------------------------------------------------------------------------
+   The edit character panel.
+
+   Wider, scrollable, and with boxes big enough to actually write in. The enhanced
+   profile can run to several thousand characters, so it needs real room rather than
+   a five line box.
+   --------------------------------------------------------------------------- */
+
+.edit-modal-panel {
+    max-width: 44rem;
+    max-height: calc(100vh - 3rem);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.edit-modal-textarea {
+    min-height: 8rem;
+    line-height: 1.55;
+    font-size: 0.9rem;
+}
+
+.edit-modal-textarea-tall {
+    min-height: 16rem;
+    font-size: 0.82rem;
+}
+
+/* Two columns on a wide screen, so the picture and the name sit beside each other and the
+   long boxes get the full width underneath. */
+@media (min-width: 820px) {
+    .edit-modal-panel {
+        max-width: 52rem;
+    }
+    .edit-modal-textarea-tall {
+        min-height: 20rem;
+    }
+}
+
+
+/* Every character card is exactly the same height.
+   The description box is fixed, the badge slot is always present, and the button is a fixed
+   size, so nothing inside a card can change its overall height. */
+.char-card {
+    min-height: 13.5rem;
+}
+
+
+/* ---------------------------------------------------------------------------
+   Spacing fixes on the settings page.
+   --------------------------------------------------------------------------- */
+
+/* The full width cards sat directly against the grid above them with no separation. */
+.settings-wide {
+    margin-top: 1.1rem;
+}
+
+/* The line about the last backup was cramped against the buttons and set too small to read
+   comfortably, in a card with plenty of room going spare. */
+#last-backup-status {
+    margin-top: 0.9rem;
+    padding-top: 0.9rem;
+    border-top: 1px solid #f1f2f4;
+    font-size: 0.8rem;
+    line-height: 1.6;
+    color: #6b7280;
+}
+
+/* Buttons that are the only action in a card are centred and full width, rather than sitting
+   awkwardly against the left edge. */
+#save-personal-context-btn,
+.settings-card > button.bg-primary:last-child {
+    display: block;
+    width: 100%;
+    text-align: center;
+    margin-top: 1rem;
+}
+
+/* The refresh link belongs beside its heading, not on a line of its own. */
+#refresh-storage-btn {
+    float: right;
+    margin-top: -1.9rem;
+}
+
+
+/* ---------------------------------------------------------------------------
+   Remaining mobile fixes.
+   --------------------------------------------------------------------------- */
+
+/* The chat header sat underneath the page header, because the space reserved for the page
+   header did not match its real height. Both now come from the measured value. */
+@media (max-width: 768px) {
+    #app > main {
+        padding-top: var(--header-h, 56px) !important;
+    }
+
+    #chat-view {
+        height: calc(100vh - var(--header-h, 56px)) !important;
+        max-height: calc(100vh - var(--header-h, 56px)) !important;
+    }
+
+    /* The chat header needs to sit below the page header, not under it. */
+    #chat-window > div:first-child {
+        position: relative;
+        z-index: 1;
+    }
+}
+
+/* The log heading, its summary and its button did not fit on one line, so the button was cut
+   off at the edge of the card. They wrap now. */
+#activity-log-card > div:first-child {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.5rem 0.75rem;
+}
+
+#activity-log-card h3 {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+#activity-log-card > div:first-child > div {
+    display: flex;
+    align-items: baseline;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    margin-left: auto;
+}
+
+#activity-log-toggle {
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+/* ---------------------------------------------------------------------------
+   The notice that says a search is hiding part of a list.
+
+   A filter with nothing on screen to explain it looks exactly like data going missing,
+   which is what happened when two search boxes shared one field. Now any filtered list
+   says so and offers a way out.
+   --------------------------------------------------------------------------- */
+
+.filter-notice {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.5rem 0.75rem;
+    margin-bottom: 0.85rem;
+    padding: 0.6rem 0.85rem;
+    border-radius: 0.65rem;
+    background: rgba(79, 70, 229, 0.07);
+    border: 1px solid rgba(79, 70, 229, 0.16);
+    font-size: 0.8rem;
+    color: #4338ca;
+}
+
+.filter-notice > span {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    min-width: 0;
+}
+
+.filter-notice button {
+    border: 0;
+    background: rgba(79, 70, 229, 0.12);
+    color: #4338ca;
+    font-size: 0.76rem;
+    font-weight: 600;
+    padding: 0.3rem 0.6rem;
+    border-radius: 0.45rem;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.15s ease;
+}
+
+.filter-notice button:hover {
+    background: rgba(79, 70, 229, 0.2);
+}
+
+/* Inside the narrow chat list it sits flush with the rows. */
+#sidebar-filter-notice {
+    margin: 0.5rem 0.75rem 0.25rem;
+    font-size: 0.75rem;
+}

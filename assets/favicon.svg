@@ -1,0 +1,19 @@
+<!-- Favicon version of the Cast mark.
+     A tab icon is drawn at 16 pixels, so the two-bubble idea and the three dots
+     would turn to mush. This keeps one bubble and one dot, which is the most of
+     the mark that survives at that size. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64"
+     role="img" aria-label="Cast">
+  <defs>
+    <linearGradient id="castFaviconInk" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#4F46E5"/>
+      <stop offset="1" stop-color="#9333EA"/>
+    </linearGradient>
+  </defs>
+  <rect x="2" y="2" width="60" height="60" rx="14" fill="url(#castFaviconInk)"/>
+  <path d="M17 18h30a6 6 0 0 1 6 6v15a6 6 0 0 1-6 6H32l-11 8v-8h-4a6 6 0 0 1-6-6V24a6 6 0 0 1 6-6z"
+        fill="#fff"/>
+  <circle cx="25" cy="31.5" r="3.4" fill="#4F46E5"/>
+  <circle cx="35" cy="31.5" r="3.4" fill="#7C3AED"/>
+  <circle cx="45" cy="31.5" r="3.4" fill="#9333EA"/>
+</svg>

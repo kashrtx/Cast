@@ -1,0 +1,20 @@
+# Dependencies. There are none at the moment, but npm may still create these.
+node_modules/
+package-lock.json
+
+# Scratch files and local experiments.
+dev_test.html
+*.local.*
+.DS_Store
+Thumbs.db
+
+# Editor bits.
+.vscode/
+.idea/
+*.swp
+
+# Backup files, in case you save one into the project folder by accident.
+# These contain your characters and chats, and possibly your API keys, so they
+# should never end up in version control.
+cast-backup-*.json
+characterChatBackup*.json

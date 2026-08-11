@@ -1,0 +1,929 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Cast</title>
+    <meta name="description" content="Your cast of characters. A browser app for roleplay chats with characters you make yourself." />
+    <link rel="icon" type="image/svg+xml" href="assets/favicon.svg" />
+    <meta name="theme-color" content="#4F46E5" />
+
+    <script>
+        // Applied before anything is drawn.
+        //
+        // The layout preference used to be read once the app had started, which is after the
+        // browser has already painted the page. The classic list appeared for a moment and
+        // then disappeared, which looked like a glitch. Reading it here removes that.
+        //
+        // Deliberately tiny and wrapped, because anything thrown here would stop the page.
+        (function () {
+            try {
+                var raw = localStorage.getItem('cast_ui_state');
+                var ui = raw ? JSON.parse(raw) : {};
+                var layout = ui && ui.chatLayout === 'classic' ? 'classic' : 'modern';
+                var root = document.documentElement;
+                root.className += ' layout-' + layout;
+                if (ui && ui.sidebarHidden && layout === 'classic') {
+                    root.className += ' sidebar-hidden';
+                }
+            } catch (error) {
+                document.documentElement.className += ' layout-modern';
+            }
+        })();
+    </script>
+    <!-- Tailwind CSS via CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Custom Tailwind Config -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#4F46E5',
+                        secondary: '#9333EA',
+                        accent: '#F97316',
+                        background: '#F9FAFB',
+                        'message-user': '#E5E7EB',
+                        'message-character': '#D1D5DB',
+                    },
+                    borderRadius: {
+                        'message': '1.5rem',
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts - Apple-like font -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap">
+    <!-- Custom styles -->
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body class="bg-background font-['Inter',sans-serif] text-gray-900 antialiased">
+    <div id="app" class="min-h-screen flex flex-col">
+        <!-- Header -->
+        <header class="bg-primary text-white p-4 shadow-md">
+            <div class="container mx-auto flex justify-between items-center">
+                <h1 class="text-xl font-bold flex items-center gap-2">
+                    <!-- The mark sits on the indigo header, so it uses a white
+                         version rather than the gradient one. -->
+                    <span class="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-white/15" aria-hidden="true">
+                        <svg viewBox="0 0 64 64" class="w-5 h-5" fill="none">
+                            <path d="M17 18h30a6 6 0 0 1 6 6v15a6 6 0 0 1-6 6H32l-11 8v-8h-4a6 6 0 0 1-6-6V24a6 6 0 0 1 6-6z"
+                                  fill="currentColor"/>
+                            <circle cx="25" cy="31.5" r="3.2" fill="#4F46E5"/>
+                            <circle cx="35" cy="31.5" r="3.2" fill="#4F46E5"/>
+                            <circle cx="45" cy="31.5" r="3.2" fill="#4F46E5"/>
+                        </svg>
+                    </span>
+                    <span id="app-name">Cast</span>
+                </h1>
+
+                <!-- Brings the character list back. Lives in the main header because that
+                     is always on screen. The one in the chat header only exists while a
+                     chat is open, so hiding the list with no chat open left no way back. -->
+                <button id="reveal-sidebar-main" title="Show the character list"
+                    class="ml-3 text-white/80 hover:text-white items-center">
+                    <i class="fas fa-angles-right"></i>
+                </button>
+                <!-- The sliding navigation.
+                     Tap a section and the pill slides to it, or take hold and drag. The
+                     ids on the buttons are unchanged, because other parts of the app
+                     look them up to mark the current view. -->
+                <nav id="main-nav" class="seg-nav" role="tablist" aria-label="Sections">
+                    <div id="seg-pill" class="seg-pill" aria-hidden="true"></div>
+                    <button type="button" id="chat-btn" class="seg-item is-active" data-view="chat"
+                        role="tab" aria-selected="true">
+                        <i class="fas fa-comments"></i><span class="seg-label">Chat</span>
+                    </button>
+                    <button type="button" id="characters-btn" class="seg-item" data-view="characters"
+                        role="tab" aria-selected="false">
+                        <i class="fas fa-user-circle"></i><span class="seg-label">Characters</span>
+                    </button>
+                    <button type="button" id="settings-btn" class="seg-item" data-view="settings"
+                        role="tab" aria-selected="false">
+                        <i class="fas fa-cog"></i><span class="seg-label">Settings</span>
+                        <span id="api-warning" class="seg-warning hidden">*</span>
+                    </button>
+                </nav>
+            </div>
+        </header>
+
+        <!-- Shown only while the older part of a chat is being summarised. -->
+        <div id="compaction-notice" class="hidden fixed bottom-4 left-1/2 -translate-x-1/2 z-50 bg-gray-800 text-white text-xs px-3 py-2 rounded-full shadow-lg flex items-center gap-2">
+            <i class="fas fa-spinner fa-spin"></i>
+            Tidying up the earlier part of this chat
+        </div>
+
+        <!-- Backup reminder.
+             Deliberately quiet. It appears at most once per session, never in the
+             first few minutes, and dismissing it keeps it away for a week. -->
+        <div id="backup-reminder"
+            class="bg-indigo-50 border-l-4 border-primary text-gray-700 p-4 m-4 rounded shadow-md hidden">
+            <div class="flex items-start">
+                <div class="py-1"><i class="fas fa-shield-halved text-primary"></i></div>
+                <div class="ml-3 flex-grow">
+                    <p id="backup-reminder-message" class="text-sm"></p>
+                    <div class="flex flex-wrap gap-3 mt-2">
+                        <button onclick="exportAppData()" class="text-sm font-semibold text-primary hover:underline">
+                            Save a backup now
+                        </button>
+                        <button onclick="dismissBackupReminder()" class="text-sm text-gray-500 hover:underline">
+                            Not now
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Notices appear as small cards over the page, built by script. -->
+
+        <!-- Main Content -->
+        <main class="flex-grow flex overflow-hidden">
+            <!-- Settings View -->
+            <div id="settings-view" class="w-full hidden">
+                <div class="container mx-auto p-5 max-w-7xl">
+                    <div class="flex items-baseline justify-between mb-5">
+                        <h2 class="text-2xl font-bold text-gray-800">Settings</h2>
+                        <span id="settings-version" class="text-sm text-gray-500"></span>
+                    </div>
+                                                            <div class="settings-grid">
+<div class="settings-card">
+                            <h3 id="provider-section-title" class="text-lg font-semibold mb-3 text-gray-700">Provider and model</h3>
+                            <p class="mb-4 text-gray-600">
+                                Your keys stay in this browser. Nothing is sent anywhere except to the provider you pick.
+                            </p>
+                            <label for="provider-select" class="block text-gray-600 mb-2">Provider</label>
+                            <select id="provider-select"
+                                class="w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-primary">
+                                <!-- Filled in from the provider registry, so a new provider needs no change here. -->
+                            </select>
+                            <p id="provider-help-text" class="text-xs text-gray-500 mt-2"></p>
+                            <div class="space-y-4">
+                                <div id="api-key-row">
+                                    <label for="api-key-input" id="api-key-label" class="block text-gray-600 mb-2">API key</label>
+                                    <div class="flex">
+                                        <input type="password" id="api-key-input" autocomplete="off"
+                                            placeholder="Paste your key"
+                                            class="flex-grow p-2 border rounded-l focus:outline-none focus:ring-2 focus:ring-primary" />
+                                        <button onclick="saveApiKey()"
+                                            class="bg-primary text-white px-4 py-2 rounded-r hover:bg-primary/90 transition">
+                                            Save
+                                        </button>
+                                    </div>
+                                    <p id="api-saved" class="text-green-600 mt-2 hidden">
+                                        <i class="fas fa-check-circle mr-1"></i> Saved
+                                    </p>
+                                    <p class="mt-2 text-sm text-gray-500">
+                                        <i class="fas fa-info-circle mr-1"></i>
+                                        <a id="api-key-link" href="#" target="_blank" rel="noopener noreferrer"
+                                            class="text-primary underline">Get a key</a>
+                                    </p>
+                                </div>
+
+                                <div id="base-url-row" class="hidden">
+                                    <label for="base-url-input" class="block text-gray-600 mb-2">Address</label>
+                                    <input type="url" id="base-url-input" spellcheck="false"
+                                        class="w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-primary" />
+                                    <p class="text-xs text-gray-500 mt-1">Leave this alone unless you know you need to change it.</p>
+                                </div>
+
+                                <div id="proxy-row">
+                                    <label for="proxy-url-input" class="block text-gray-600 mb-2">Proxy address</label>
+                                    <input type="url" id="proxy-url-input" spellcheck="false" placeholder="Worked out automatically"
+                                        class="w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-primary" />
+                                    <p id="proxy-status" class="text-xs text-gray-500 mt-1"></p>
+                                    <p class="text-xs text-gray-500 mt-1">
+                                        Some providers will not accept requests sent straight from a web page. Those go
+                                        through a small function running on your own site instead, which is included in
+                                        this project. Leave this empty and it is worked out from the address the app is
+                                        served from.
+                                    </p>
+                                </div>
+
+                                <div>
+                                    <label for="model-input" class="block text-gray-600 mb-2">Model</label>
+                                    <input type="text" id="model-input" list="model-suggestions" spellcheck="false"
+                                        autocapitalize="off" autocorrect="off"
+                                        placeholder="Type a model name"
+                                        class="w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-primary" />
+                                    <datalist id="model-suggestions"></datalist>
+
+                                    <div class="flex flex-wrap items-center gap-3 mt-2">
+                                        <button type="button" id="load-models-btn"
+                                            class="text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1.5 rounded transition">
+                                            Load available models
+                                        </button>
+                                        <label id="free-only-row" class="hidden flex items-center gap-2 text-sm text-gray-600">
+                                            <input type="checkbox" id="free-only-checkbox" checked
+                                                class="rounded border-gray-300" />
+                                            Free models only
+                                        </label>
+                                    </div>
+
+                                    <p id="model-suggestion-count" class="text-xs text-gray-500 mt-2"></p>
+                                    <p class="text-xs text-gray-500 mt-1">
+                                        This is a plain text field on purpose. Type any model name you like, including one
+                                        released after this app was built. The suggestions are only a shortcut.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+<div class="settings-card">
+                            <h3 class="text-lg font-semibold mb-3 text-gray-700">Generation Settings</h3>
+                            <div class="space-y-4">
+                                <div>
+                                    <label for="temperature-range" class="block text-gray-600 mb-2">
+                                        Temperature: <span id="temperature-value">1.0</span>
+                                    </label>
+                                    <input type="range" id="temperature-range" min="0" max="2" step="0.1" value="1.0"
+                                        class="w-full accent-primary">
+                                    <div class="flex justify-between text-sm text-gray-500">
+                                        <span>Focused</span>
+                                        <span>Balanced</span>
+                                        <span>Creative</span>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label for="enhanced-context-tokens" class="block text-gray-600 mb-2">
+                                        Character Enhancement Token Limit
+                                    </label>
+                                    <input type="number" id="enhanced-context-tokens"
+                                        class="w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-primary"
+                                        min="1" max="65536" value="4096">
+                                </div>
+
+                                <div>
+                                    <label for="conversation-tokens" class="block text-gray-600 mb-2">
+                                        Response limit
+                                    </label>
+                                    <input type="number" id="conversation-tokens"
+                                        class="w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-primary"
+                                        min="256" max="65536" value="4096">
+                                    <p class="text-xs text-gray-500 mt-1">How long a reply can be. Raise this if replies are being cut off.</p>
+                                    <p id="token-limit-warning" class="text-xs text-amber-600 mt-1 hidden"></p>
+                                </div>
+                            </div>
+
+                            <div class="mt-6 border-t pt-4">
+                                <button id="test-model-btn"
+                                    class="w-full bg-accent text-white px-4 py-2 rounded hover:bg-accent/90 transition flex items-center justify-center gap-2">
+                                    <i class="fas fa-vial"></i>
+                                    Check the connection
+                                </button>
+                                <div id="test-result" class="mt-3 p-3 rounded text-sm hidden">
+                                    <div class="flex items-start gap-2">
+                                        <i id="test-icon" class="fas fa-spinner fa-spin mt-1 text-blue-600"></i>
+                                        <div>
+                                            <p id="test-status" class="font-medium"></p>
+                                            <p id="test-details" class="text-xs mt-1"></p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+<div class="settings-card">
+                            <h3 class="text-lg font-semibold mb-3 text-gray-700">Personal Context</h3>
+                            <p class="mb-4 text-gray-600">
+                                Add information about yourself to help the AI better understand and interact with you.
+                            </p>
+                            <div class="space-y-4">
+                                <div>
+                                    <label for="user-name" class="block text-gray-600 mb-2">Your Name</label>
+                                    <input type="text" id="user-name" placeholder="Enter your name"
+                                        class="w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-primary" />
+                                </div>
+                                <div>
+                                    <label for="user-personality" class="block text-gray-600 mb-2">Your Personality</label>
+                                    <textarea id="user-personality"
+                                        placeholder="Describe your personality traits, interests, and communication style..."
+                                        rows="3"
+                                        class="w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-primary resize-none"></textarea>
+                                </div>
+                                <div>
+                                    <label for="user-context" class="block text-gray-600 mb-2">Additional Context</label>
+                                    <textarea id="user-context"
+                                        placeholder="Add any other relevant information about yourself, preferences, or background..."
+                                        rows="4"
+                                        class="w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-primary resize-none"></textarea>
+                                </div>
+                                <button id="save-personal-context-btn" onclick="savePersonalContext()"
+                                    class="bg-primary text-white px-4 py-2 rounded hover:bg-primary/90 transition">Save Personal Context
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="settings-card">
+                            <h3 class="text-lg font-semibold mb-3 text-gray-700">Chat behaviour</h3>
+                            <p class="text-gray-600 mb-3 text-sm">
+                                How the chat page is arranged.
+                            </p>
+                            <div class="space-y-2">
+                                <label class="flex items-start gap-2 text-sm text-gray-700 cursor-pointer">
+                                    <input type="radio" name="chat-layout" value="modern" class="mt-1" />
+                                    <span>
+                                        Modern
+                                        <span class="block text-xs text-gray-500">
+                                            A board of your characters with search, showing what you last said to each.
+                                        </span>
+                                    </span>
+                                </label>
+                                <label class="flex items-start gap-2 text-sm text-gray-700 cursor-pointer">
+                                    <input type="radio" name="chat-layout" value="classic" class="mt-1" />
+                                    <span>
+                                        Classic
+                                        <span class="block text-xs text-gray-500">
+                                            The list down the side, as it was before. Can be hidden on a wide screen.
+                                        </span>
+                                    </span>
+                                </label>
+                            </div>
+                        
+
+                            <hr class="settings-divider">
+
+                            <label class="flex items-start gap-2 mb-3 text-sm text-gray-700">
+                                <input type="checkbox" id="memory-compaction-toggle" class="mt-1 rounded border-gray-300" />
+                                <span>
+                                    Summarise the older part of long chats
+                                    <span class="block text-xs text-gray-500 mt-1 leading-relaxed">
+                                        Long chats get slow and expensive, because the whole conversation is sent
+                                        again every time. This replaces the older part with written notes and keeps
+                                        recent messages word for word.
+                                        <br>
+                                        Your messages are never changed. Turn it off and the next reply sees
+                                        everything again.
+                                        <a href="#" id="memory-more-link" class="text-primary underline">Why this happens</a>
+                                    </span>
+                                    <span id="memory-more" class="hidden block text-xs text-gray-500 mt-2 leading-relaxed">
+                                        A model has no memory. Every time you press send, the entire conversation goes
+                                        with it. By message two hundred each reply is resending all two hundred, so
+                                        the cost grows with the square of the length. On one real chat here, 219
+                                        messages long, the last turn alone sent about 15,600 tokens.
+                                        <br><br>
+                                        Notes are less precise than the real thing, so an exact turn of phrase from
+                                        early on can be lost. That is why this is off by default.
+                                    </span>
+                                </span>
+                            </label>
+
+                            <div id="memory-panel" class="text-xs text-gray-500"></div>
+                        
+                        </div>
+
+<div class="settings-card">
+                            <h3 class="text-lg font-semibold mb-3 text-gray-700">Backups</h3>
+                            <p class="text-gray-600 mb-4">
+                                One file holding your characters, chats and settings. Loading a file replaces what is
+                                here, and asks first.
+                            </p>
+
+                            <label class="flex items-start gap-2 mb-4 text-sm text-gray-700">
+                                <input type="checkbox" id="include-key-in-backups" class="mt-1 rounded border-gray-300" />
+                                <span>
+                                    Include my API keys in backups
+                                    <span class="block text-xs text-gray-500 mt-0.5">
+                                        Off by default. With this on, anyone you send the file to can use your keys.
+                                    </span>
+                                </span>
+                            </label>
+
+                            <div class="flex flex-col sm:flex-row gap-3">
+                                <button id="export-data-btn"
+                                    class="bg-primary text-white px-4 py-2 rounded hover:bg-primary/90 transition flex items-center justify-center gap-2">
+                                    <i class="fas fa-download"></i>
+                                    Save a backup
+                                </button>
+                                <button id="import-data-btn"
+                                    class="bg-secondary text-white px-4 py-2 rounded hover:bg-secondary/90 transition flex items-center justify-center gap-2">
+                                    <i class="fas fa-upload"></i>
+                                    Load a backup
+                                </button>
+                            </div>
+
+                            <p id="last-backup-status" class="text-xs text-gray-500 mt-3"></p>
+
+                        </div>
+
+                        <div class="settings-card">
+                            <h3 class="text-lg font-semibold mb-3 text-gray-700">Storage and app</h3>
+                            <div class="flex items-center justify-between mb-3">
+                                <button type="button" id="refresh-storage-btn"
+                                    class="text-sm text-primary hover:underline">Refresh</button>
+                            </div>
+                            <p class="mb-4 text-gray-600">
+                                A browser only gives this page a few megabytes for text. Pictures are kept somewhere
+                                roomier so they cannot push your chats out.
+                            </p>
+                            <div id="storage-panel"></div>
+                        
+
+                            <hr class="settings-divider">
+
+                            <p class="text-gray-600">
+                                Everything runs in this browser and stays on this device. The only thing that leaves
+                                is the conversation you send to the provider you picked.
+                            </p>
+                            <p class="text-gray-500 text-sm mt-3">
+                                Clearing your browser data deletes everything, so keep backups.
+                                <span id="about-version" class="block mt-1"></span>
+                            </p>
+                        
+                        </div>
+                    </div>
+
+<div class="settings-card settings-wide" id="local-ai-bridge-settings">
+                            <h3 class="text-lg font-semibold mb-3 text-gray-700">Using a model on your own machine</h3>
+                            <p class="text-gray-600 mb-3">
+                                A browser will not let a page on the open internet quietly reach into your own machine.
+                                What you need depends on where this page is: nothing at all if you opened it from a file
+                                or from localhost, a one time permission if you are on the deployed site reaching the same
+                                computer, and the bridge below if you are on a phone reaching your computer across the
+                                network.
+                            </p>
+                            <ol class="list-decimal pl-5 space-y-2 text-sm text-gray-600">
+                                <li>Install Tampermonkey in the browser that opens this app.</li>
+                                <li><a href="local-ai-bridge.user.js" target="_blank" rel="noopener noreferrer" class="text-primary underline">Install the Local AI Bridge userscript</a>.</li>
+                                <li>Keep your phone and PC on the same Wi-Fi.</li>
+                                <li>Start Ollama or LM Studio with local-network access enabled on the PC.</li>
+                                <li>Use your PC LAN IP endpoint, such as <code class="bg-gray-100 px-1 rounded">http://192.168.1.25:11434</code> for Ollama or <code class="bg-gray-100 px-1 rounded">http://192.168.1.25:1234/v1</code> for LM Studio.</li>
+                                <li>Click Test Configuration before chatting.</li>
+                            </ol>
+                            <p id="local-bridge-status" class="mt-3 text-xs text-gray-500">
+                                Bridge status: not detected in this browser yet.
+                            </p>
+                        </div>
+
+<div class="settings-card settings-wide" id="activity-log-card">
+                            <div class="flex items-center justify-between mb-1">
+                                <h3 class="text-lg font-semibold text-gray-700 flex items-center gap-2">
+                                    <i class="fas fa-list-timeline text-primary"></i>
+                                    Activity and error log
+                                </h3>
+                                <div class="flex items-center gap-3">
+                                    <span id="activity-log-summary" class="text-xs text-gray-500"></span>
+                                    <button type="button" id="activity-log-toggle"
+                                        class="text-sm text-primary hover:underline flex items-center gap-1">
+                                        <i class="fas fa-chevron-down text-xs" id="activity-log-chevron"></i>
+                                        <span id="activity-log-label">Hide</span>
+                                    </button>
+                                </div>
+                            </div>
+                            <p class="text-gray-600 mb-3 text-sm">
+                                Everything that has happened, newest first. This is where to look when a reply fails
+                                or something goes missing. Entries since your last backup are darker.
+                            </p>
+                            <div id="activity-log" class="max-h-72 overflow-y-auto rounded-lg bg-gray-50 border border-gray-200 p-3 font-mono text-xs leading-relaxed"></div>
+                        </div>
+                </div>
+            </div>
+
+            <!-- Characters View -->
+            <div id="characters-view" class="w-full hidden">
+                <div class="container mx-auto p-5 max-w-7xl">
+                    <div class="characters-layout">
+                        <!-- Create Character -->
+                        <div class="bg-white rounded-lg shadow-lg p-6">
+                            <h2 class="text-2xl font-bold mb-6 text-gray-800">Create New Character</h2>
+
+                            <div class="mb-4">
+                                <label class="block text-gray-700 mb-2">Profile Picture</label>
+                                <div class="flex flex-col items-center">
+                                    <div id="profile-picture-preview"
+                                        class="w-32 h-32 rounded-full bg-gray-200 mb-3 flex items-center justify-center text-gray-500 text-4xl overflow-hidden">
+                                        <i class="fas fa-user"></i>
+                                    </div>
+                                    <div class="flex space-x-2 justify-center">
+                                        <label for="profile-picture-upload"
+                                            class="cursor-pointer bg-secondary text-white px-3 py-2 rounded hover:bg-secondary/90 transition">
+                                            <i class="fas fa-upload mr-1"></i> Upload Picture
+                                        </label>
+                                        <button id="remove-profile-picture"
+                                            class="bg-red-500 text-white px-3 py-2 rounded hover:bg-red-600 transition hidden">
+                                            <i class="fas fa-trash mr-1"></i> Remove
+                                        </button>
+                                    </div>
+                                    <input type="file" id="profile-picture-upload"
+                                        accept="image/jpeg, image/png, image/webp" class="hidden" />
+                                    <p class="text-xs text-gray-500 mt-2 text-center">Supported formats: JPG, PNG, WebP.
+                                        Max size: 2MB. Recommended: 200x200px.</p>
+                                </div>
+                            </div>
+
+                            <div class="mb-4">
+                                <label class="block text-gray-700 mb-2">Character Name</label>
+                                <input type="text" id="character-name" placeholder="e.g., Sherlock Holmes"
+                                    class="w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-primary" />
+                            </div>
+
+                            <div class="mb-4">
+                                <label class="block text-gray-700 mb-2">Character Context</label>
+                                <textarea id="character-context"
+                                    placeholder="Describe the character (e.g., Sherlock Holmes, a brilliant detective from Victorian London)"
+                                    rows="5"
+                                    class="w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-primary resize-y overflow-auto max-h-60"></textarea>
+                            </div>
+
+                            <div class="flex justify-center">
+                                <button id="create-character-btn"
+                                    class="bg-primary text-white px-4 py-2 rounded hover:bg-primary/90 transition disabled:bg-gray-400">
+                                    Create Character
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Character List -->
+                        <div class="bg-white rounded-lg shadow-lg p-6">
+                            <div class="mb-6 p-4 border rounded-lg bg-gray-50">
+                                <h3 class="text-lg font-semibold mb-3 text-gray-700">Filter & Sort Characters</h3>
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div>
+                                        <label for="search-characters-input"
+                                            class="block text-sm font-medium text-gray-700 mb-1">Search:</label>
+                                        <input type="search" id="search-characters-input"
+                                            placeholder="Search names, descriptions and messages"
+                                            class="w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-primary" />
+                                    </div>
+                                    <div>
+                                        <label for="sort-characters-select"
+                                            class="block text-sm font-medium text-gray-700 mb-1">Sort by:</label>
+                                        <select id="sort-characters-select"
+                                            class="w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-primary">
+                                            <option value="createdAt_desc">Latest Created</option>
+                                            <option value="createdAt_asc">Oldest Created</option>
+                                            <option value="name_asc">Name (A-Z)</option>
+                                            <option value="name_desc">Name (Z-A)</option>
+                                            <option value="lastChat_desc">Last Chatted (Recent First)</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                            <h2 class="text-2xl font-bold mb-6 text-gray-800">Your Characters</h2>
+
+                            <div id="character-list" class="character-grid">
+                                <p id="no-characters" class="text-gray-500 italic">No characters created yet</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Chat View -->
+            <div id="chat-view" class="w-full flex h-full">
+                <!-- Character Sidebar -->
+                <div id="character-sidebar"
+                    class="w-64 bg-white border-r flex flex-col h-full transition-all duration-300 ease-in-out lg:translate-x-0">
+                    <div class="p-4 border-b flex justify-between items-center">
+                        <h2 class="font-bold text-gray-800">Chat With Characters</h2>
+                        <button id="hide-sidebar-btn" title="Hide this list"
+                            class="text-gray-400 hover:text-primary ml-auto mr-2 hidden md:inline-flex">
+                            <i class="fas fa-angles-left"></i>
+                        </button>
+                        <button id="toggle-sidebar-btn" class="text-gray-600 hover:text-primary hidden"
+                            aria-label="Toggle Character Menu">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+
+                    <div class="px-4 pb-3">
+                        <div class="relative">
+                            <i class="fas fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs"></i>
+                            <input type="search" id="sidebar-search" placeholder="Search names, descriptions and messages"
+                                autocomplete="off"
+                                class="w-full pl-8 pr-3 py-2 text-sm bg-gray-100 border border-transparent rounded-full focus:bg-white focus:border-primary focus:outline-none" />
+                        </div>
+                    </div>
+
+                    <div id="sidebar-characters" class="flex-grow overflow-y-auto">
+                        <p class="text-gray-500 italic p-4 text-sm">
+                            No characters created yet. Go to Characters tab to create some.
+                        </p>
+                    </div>
+                </div>
+
+                <div id="chat-placeholder" class="flex-grow flex items-center justify-center bg-gray-50 p-4">
+                    <button id="show-characters-btn"
+                        class="text-gray-600 hover:text-primary absolute top-4 left-4 lg:hidden"
+                        aria-label="Show Characters">
+                        <i class="fas fa-bars"></i>
+                    </button>
+                    <div id="chat-home" class="w-full h-full overflow-y-auto">
+                        <div class="max-w-4xl mx-auto px-5 py-8">
+                            <div class="flex items-baseline justify-between mb-1">
+                                <h2 class="text-2xl font-bold text-gray-800">Your cast</h2>
+                                <span id="home-count" class="text-sm text-gray-500"></span>
+                            </div>
+                            <p id="home-provider" class="text-sm text-gray-500 mb-6"></p>
+
+                            <div class="relative mb-6">
+                                <i class="fas fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-sm"></i>
+                                <input type="search" id="home-search" placeholder="Search names, descriptions and messages"
+                                    autocomplete="off"
+                                    class="w-full pl-11 pr-4 py-3 bg-white border rounded-xl shadow-sm focus:border-primary focus:outline-none" />
+                            </div>
+
+                            <div id="home-recent-section" class="mb-8 hidden">
+                                <h3 class="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-3">Carry on</h3>
+                                <div id="home-recent" class="grid gap-3 sm:grid-cols-2"></div>
+                            </div>
+
+                            <div id="home-all-section">
+                                <h3 class="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-3">Everyone</h3>
+                                <div id="home-all" class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3"></div>
+                            </div>
+
+                            <div id="home-empty" class="hidden text-center py-16">
+                                <i class="fas fa-comments text-5xl text-gray-300 mb-4"></i>
+                                <p class="text-gray-500 mb-4">No characters yet.</p>
+                                <button onclick="changeView('characters')"
+                                    class="bg-primary text-white px-5 py-2.5 rounded-xl hover:bg-primary/90 transition">
+                                    Make your first one
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="chat-window" class="flex-grow flex flex-col bg-gray-50 hidden">
+                    <!-- Chat header -->
+                    <div class="p-4 bg-white border-b flex justify-between items-center shadow-sm">
+                        <div class="flex items-center space-x-4 max-w-[60%]">
+                            <button id="show-chat-sidebar-btn"
+                                class="text-gray-600 hover:text-primary lg:hidden flex-shrink-0"
+                                aria-label="Show Characters">
+                                <i class="fas fa-bars"></i>
+                            </button>
+                            <div class="flex items-center">
+                                <button id="reveal-sidebar-btn" title="Show the character list"
+                                    class="text-gray-500 hover:text-primary mr-3 items-center">
+                                    <i class="fas fa-angles-right"></i>
+                                </button>
+                                <button id="back-to-home-btn" title="Back to your cast"
+                                    class="text-gray-500 hover:text-primary mr-3 hidden md:inline-flex">
+                                    <i class="fas fa-chevron-left"></i>
+                                </button>
+                                <div id="chat-header-avatars" class="flex mr-2"></div>
+                                <div class="overflow-hidden">
+                                    <h2 id="chat-header-title" class="font-bold text-gray-800 truncate">Character Name
+                                    </h2>
+                                    <p id="chat-header-subtitle" class="text-sm text-gray-500 truncate">Private
+                                        conversation</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="flex items-center space-x-2 flex-wrap justify-end">
+                            <button id="new-chat-btn"
+                                class="text-primary hover:text-primary/80 px-2 py-1 rounded text-sm md:text-base"
+                                title="Start a new chat with this character">
+                                <i class="fas fa-plus-circle"></i> <span class="hidden sm:inline">New Chat</span>
+                            </button>
+                            <button id="chat-history-btn"
+                                class="text-primary hover:text-primary/80 px-2 py-1 rounded text-sm md:text-base"
+                                title="View chat history">
+                                <i class="fas fa-history"></i> <span class="hidden sm:inline">History</span>
+                            </button>
+                            <button onclick="clearChatMessages()"
+                                class="text-red-500 hover:text-red-700 px-2 py-1 rounded text-sm md:text-base"
+                                title="Clear chat">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Chat messages -->
+                    <div id="chat-messages" class="flex-grow overflow-y-auto p-4 chat-window">
+                        <div class="text-center text-gray-500 mt-8">
+                            <p>No messages yet. Start the conversation!</p>
+                        </div>
+                    </div>
+
+                    <!-- Message input -->
+                    <div id="chat-input-container" class="p-4 bg-white border-t chat-input-container">
+                        <form id="chat-form" class="flex space-x-2">
+                            <textarea id="message-input" placeholder="Message... (Shift+Enter for a new line)"
+                                class="flex-grow p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary resize-y overflow-y-auto min-h-[40px] max-h-[200px]"
+                                rows="3" autocomplete="off" spellcheck="true"></textarea>
+                            <button type="submit" id="send-message-btn"
+                                class="bg-primary text-white p-3 w-12 rounded-full hover:bg-primary/90 transition disabled:bg-gray-400">
+                                <i class="fas fa-paper-plane"></i>
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Chat History Modal -->
+        <div id="chat-history-modal"
+            class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden p-4">
+            <div class="bg-white rounded-lg shadow-xl w-full max-w-md max-h-[90vh] flex flex-col">
+                <div class="p-4 border-b flex justify-between items-center">
+                    <h3 class="text-lg font-bold text-gray-800">Chat History</h3>
+                    <button id="close-history-modal-btn" class="text-gray-500 hover:text-gray-700 p-2">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div id="chat-history-list" class="p-4 overflow-y-auto flex-grow">
+                    <p class="text-gray-500 italic text-center">No chat history available</p>
+                </div>
+                <div class="p-3 border-t flex justify-end">
+                    <button id="close-history-btn"
+                        class="bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded">
+                        Close
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Load Gemini SDK -->
+    <script>
+        // Initialize global variable for debugging
+        window.debugApp = false;
+
+        // Optional debugging function for console
+        function toggleDebug() {
+            window.debugApp = !window.debugApp;
+            console.log("Debug mode:", window.debugApp ? "ON" : "OFF");
+            return "Debug mode " + (window.debugApp ? "enabled" : "disabled");
+        }
+
+        // Ensure the sidebar position is adjusted when the DOM content is loaded
+        document.addEventListener('DOMContentLoaded', () => {
+            const adjustLayout = () => {
+                const sidebar = document.getElementById('character-sidebar');
+                const header = document.querySelector('header');
+                const main = document.querySelector('main');
+
+                if (sidebar && header && main && window.innerWidth < 1024) {
+                    // Perform reads first
+                    const headerHeight = header.offsetHeight;
+
+                    // Perform writes
+                    header.style.position = 'fixed';
+                    header.style.top = '0';
+                    header.style.left = '0';
+                    header.style.right = '0';
+                    header.style.width = '100%';
+                    header.style.zIndex = '51'; // Ensure this is appropriate
+
+                    sidebar.style.top = `${headerHeight}px`;
+                    const sidebarHeightCalc = `calc(100vh - ${headerHeight}px)`;
+                    sidebar.style.height = sidebarHeightCalc;
+                    sidebar.style.maxHeight = sidebarHeightCalc;
+
+                    main.style.paddingTop = `${headerHeight}px`;
+                } else if (main) {
+                    // Reset styles if condition not met (e.g., on wider screens)
+                    main.style.paddingTop = '';
+                    if (header) {
+                        header.style.position = ''; // Or original value
+                        // Reset other header styles if necessary
+                    }
+                    if (sidebar) {
+                        sidebar.style.top = '';
+                        sidebar.style.height = '';
+                        sidebar.style.maxHeight = '';
+                    }
+                }
+            };
+
+            // Initial adjustment
+            requestAnimationFrame(adjustLayout);
+
+            // Re-adjust on resize
+            window.addEventListener('resize', () => {
+                requestAnimationFrame(adjustLayout);
+            });
+
+            // The original script also had a nested setTimeout(..., 200)
+            // to re-apply calculations. This was likely to handle cases where
+            // headerHeight might change after initial render (e.g., images loading in header).
+            // A more robust way is to call adjustLayout after a delay or on window.load
+            // if initial header height is unstable. For now, let's remove the nested setTimeout
+            // and rely on the initial call and resize listener.
+            // If header height instability is an issue, a single delayed call might be added:
+            setTimeout(() => requestAnimationFrame(adjustLayout), 300); // One delayed call
+        });
+    </script>
+
+    <!-- Markdown is handled by src/markdown.js now, so the marked library is no
+         longer loaded. That is one less thing fetched from a CDN and one less thing
+         that can change underneath the app. -->
+    <!-- Cleans the HTML that src/markdown.js produces, as a second layer over
+         anything a model sends. -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.9/purify.min.js"></script>
+
+    <!-- Edit Character Modal -->
+    <div id="edit-character-modal"
+        class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden p-4">
+        <div class="bg-white rounded-2xl shadow-xl p-6 w-full mx-auto edit-modal-panel">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-xl font-bold text-gray-800">Edit Character</h2>
+                <button id="close-edit-modal" class="text-gray-600 hover:text-gray-800">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <div class="mb-4">
+                <label class="block text-gray-700 mb-2">Profile Picture</label>
+                <div class="flex flex-col items-center">
+                    <div id="edit-profile-picture-preview"
+                        class="w-32 h-32 rounded-full bg-gray-200 mb-3 flex items-center justify-center text-gray-500 text-4xl overflow-hidden">
+                        <i class="fas fa-user"></i>
+                    </div>
+                    <div class="flex space-x-2 justify-center">
+                        <label for="edit-profile-picture-upload"
+                            class="cursor-pointer bg-secondary text-white px-3 py-2 rounded hover:bg-secondary/90 transition">
+                            <i class="fas fa-upload mr-1"></i> Upload Picture
+                        </label>
+                        <button id="edit-remove-profile-picture"
+                            class="bg-red-500 text-white px-3 py-2 rounded hover:bg-red-600 transition hidden">
+                            <i class="fas fa-trash mr-1"></i> Remove
+                        </button>
+                    </div>
+                    <input type="file" id="edit-profile-picture-upload" accept="image/jpeg, image/png, image/webp"
+                        class="hidden" />
+                    <p class="text-xs text-gray-500 mt-2 text-center">Supported formats: JPG, PNG, WebP. Max size: 2MB.
+                        Recommended: 200x200px.</p>
+                </div>
+            </div>
+
+            <div class="mb-4">
+                <label class="block text-gray-700 mb-2">Character Name</label>
+                <input type="text" id="edit-character-name" placeholder="e.g., Sherlock Holmes"
+                    class="w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-primary" />
+                <input type="hidden" id="edit-character-id">
+            </div>
+
+            <div class="mb-4">
+                <label class="block text-gray-700 mb-2">Character Context</label>
+                <textarea id="edit-character-context" placeholder="Describe the character" rows="6"
+                    class="w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary resize-y edit-modal-textarea"></textarea>
+            </div>
+
+            <div class="mb-4" id="edit-enhanced-wrap">
+                <div class="flex items-baseline justify-between mb-2 gap-3">
+                    <label class="block text-gray-700">Enhanced profile</label>
+                    <span id="edit-enhanced-meta" class="text-xs text-gray-500"></span>
+                </div>
+                <p class="text-xs text-gray-500 mb-2">
+                    The fuller profile written by Build profile. This is what the character actually
+                    receives, so editing it here changes how they behave. Leave it empty to fall back to
+                    the description above.
+                </p>
+                <textarea id="edit-enhanced-context" placeholder="Nothing has been built yet. Use Build profile on the character card, or write your own here." rows="12"
+                    class="w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary resize-y edit-modal-textarea edit-modal-textarea-tall font-mono"></textarea>
+                <div class="flex flex-wrap gap-2 mt-2">
+                    <button type="button" id="edit-enhanced-clear"
+                        class="text-xs text-gray-600 hover:text-red-600 underline">
+                        Clear the enhanced profile
+                    </button>
+                </div>
+            </div>
+
+            <div class="flex gap-2 pt-1">
+                <button id="save-character-btn"
+                    class="bg-primary text-white px-4 py-2.5 rounded-lg hover:bg-primary/90 transition flex-grow font-medium">
+                    Save Changes
+                </button>
+                <button type="button" id="cancel-edit-btn"
+                    class="bg-gray-100 text-gray-700 px-4 py-2.5 rounded-lg hover:bg-gray-200 transition">
+                    Cancel
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- The app is split into modules that each do one job.
+         These are ordinary scripts loaded in order rather than ES modules, which
+         keeps the app working when you open index.html straight from disk. Each
+         one also works under Node, which is how the tests run.
+         Order matters: brand and the small helpers first, then the pieces that
+         use them, then the app itself. -->
+    <script src="src/brand.js"></script>
+    <script src="src/ids.js"></script>
+    <script src="src/escape.js"></script>
+    <script src="src/markdown.js"></script>
+    <script src="src/input.js"></script>
+    <script src="src/activitylog.js"></script>
+    <script src="src/toast.js"></script>
+    <script src="src/segmentnav.js"></script>
+    <script src="src/group.js"></script>
+    <script src="src/confirm.js"></script>
+    <script src="src/storage.js"></script>
+    <script src="src/images.js"></script>
+    <script src="src/thinking.js"></script>
+    <script src="src/providers.js"></script>
+    <script src="src/memory.js"></script>
+    <script src="src/backup.js"></script>
+    <script src="script.js"></script>
+</body>
+
+</html>

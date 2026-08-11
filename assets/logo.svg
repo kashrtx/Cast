@@ -1,0 +1,30 @@
+<!-- The Cast mark.
+     Two speech bubbles overlapping, because a cast is more than one voice and
+     the overlap is where a conversation happens.
+
+     The gap between the bubbles is a stroke in the page background colour rather
+     than a mask, which is a simpler technique that renders the same way
+     everywhere. Colours are the app's existing indigo and purple. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64"
+     role="img" aria-label="Cast">
+  <defs>
+    <linearGradient id="castInk" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#4F46E5"/>
+      <stop offset="1" stop-color="#9333EA"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Back bubble, the second voice, sitting behind and to the right. -->
+  <rect x="24" y="9" width="31" height="27" rx="9" fill="url(#castInk)" opacity="0.32"/>
+
+  <!-- Front bubble. The stroke is the background colour, so it reads as a clean
+       gap where it crosses the bubble behind it. -->
+  <path d="M17 19h24a9 9 0 0 1 9 9v11a9 9 0 0 1-9 9h-8l-9 7v-7h-7a9 9 0 0 1-9-9V28a9 9 0 0 1 9-9z"
+        fill="url(#castInk)" stroke="#F9FAFB" stroke-width="3.5" stroke-linejoin="round"/>
+
+  <!-- Three voices waiting their turn. Uneven on purpose, because a cast is not
+       a row of identical parts. -->
+  <circle cx="22.5" cy="33.5" r="3" fill="#fff"/>
+  <circle cx="31.5" cy="33.5" r="3.6" fill="#fff"/>
+  <circle cx="40.5" cy="33.5" r="2.5" fill="#fff" opacity="0.85"/>
+</svg>

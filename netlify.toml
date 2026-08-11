@@ -1,0 +1,21 @@
+# Netlify configuration.
+#
+# The only thing here that matters is the proxy. Some providers refuse requests that come
+# straight from a web page, so those go through a function running on this site instead. See
+# netlify/functions/ai-proxy.mjs for why that is necessary.
+
+[build]
+  # Nothing to build. The app is plain files.
+  publish = "."
+  command = ""
+
+[functions]
+  directory = "netlify/functions"
+  node_bundler = "esbuild"
+
+# A tidier address for the proxy than the default one.
+[[redirects]]
+  from = "/api/proxy"
+  to = "/.netlify/functions/ai-proxy"
+  status = 200
+  force = true

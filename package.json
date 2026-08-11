@@ -1,0 +1,20 @@
+{
+  "name": "cast",
+  "version": "2.18.0",
+  "description": "Cast. A browser app for roleplay chats with characters you write yourself, using whichever AI provider you like.",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test tests/*.test.js"
+  },
+  "keywords": [
+    "roleplay",
+    "characters",
+    "chat"
+  ],
+  "license": "MIT",
+  "private": true,
+  "engines": {
+    "node": ">=18"
+  }
+}
