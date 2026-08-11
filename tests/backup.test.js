@@ -342,3 +342,70 @@ test("changes accumulate", () => {
     state = B.recordChange(state, 4);
     assert.strictEqual(state.changesSinceBackup, 5);
 });
+
+// A backup taken with "include key in backups" turned off still had the key in it, one level down
+// inside settings, because settings is where keys are kept and the whole settings object was copied
+// into the file. Anyone who sent a backup to someone else, or put one in a bug report, sent their
+// key with it.
+//
+// These are here so that cannot come back. The switch has to cover every field a key has ever lived
+// in, not only the obvious one.
+test('a backup taken with the key switch off contains no key anywhere', () => {
+    const settings = {
+        provider: 'openai',
+        temperature: 0.8,
+        apiKeys: { openai: 'sk-SECRET-CURRENT', gemini: 'SECRET-GEMINI' },
+        apiKey: 'SECRET-LEGACY-SINGLE',
+        geminiApiKey: 'SECRET-LEGACY-GEMINI',
+        key: 'SECRET-LEGACY-BARE',
+    };
+
+    const payload = B.buildExport({
+        data: {
+            characters: [{ id: 'a', name: 'Ada' }],
+            chats: {},
+            settings,
+            apiKeys: settings.apiKeys,
+        },
+        brand: BRAND,
+        includeApiKey: false,
+    });
+
+    const text = JSON.stringify(payload);
+    [
+        'sk-SECRET-CURRENT', 'SECRET-GEMINI', 'SECRET-LEGACY-SINGLE',
+        'SECRET-LEGACY-GEMINI', 'SECRET-LEGACY-BARE',
+    ].forEach((secret) => {
+        assert.ok(!text.includes(secret), `${secret} was written into the backup`);
+    });
+
+    // Everything that is not a key still has to be there, or the setting would cost you your
+    // settings as well as protecting your key.
+    assert.strictEqual(payload.settings.provider, 'openai');
+    assert.strictEqual(payload.settings.temperature, 0.8);
+    assert.strictEqual(payload.characters.length, 1);
+});
+
+test('a backup taken with the key switch on does contain the key', () => {
+    const settings = { provider: 'openai', apiKeys: { openai: 'sk-SECRET-CURRENT' } };
+    const payload = B.buildExport({
+        data: { characters: [], chats: {}, settings, apiKeys: settings.apiKeys },
+        brand: BRAND,
+        includeApiKey: true,
+    });
+
+    assert.ok(JSON.stringify(payload).includes('sk-SECRET-CURRENT'),
+        'asking for the key and not getting it would be worse than not asking');
+});
+
+test('building a backup never alters the live settings', () => {
+    const settings = { provider: 'openai', apiKeys: { openai: 'sk-SECRET-CURRENT' } };
+    B.buildExport({
+        data: { characters: [], chats: {}, settings, apiKeys: settings.apiKeys },
+        brand: BRAND,
+        includeApiKey: false,
+    });
+
+    assert.deepStrictEqual(settings.apiKeys, { openai: 'sk-SECRET-CURRENT' },
+        'taking a backup must not clear the key you are using');
+});

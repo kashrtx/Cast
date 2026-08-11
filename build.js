@@ -6,30 +6,54 @@
 //
 // Opening index.html straight from the repository still works exactly as before. This only runs on
 // deploy.
+//
+// The list of scripts is read out of index.html rather than written down here. It used to be a
+// second copy of the list, which is fine until the day the two disagree and the deployed app is
+// missing a file that works perfectly well locally. Now there is one list, in the page, and a
+// missing file stops the build.
 
 const fs = require('fs');
 const path = require('path');
 
 const OUT = 'public';
 
-// Everything the app needs in a browser. Tests, tooling and the function are left out.
-const FILES = [
+// Files the app needs that are not scripts.
+const EXTRA_FILES = [
     'index.html',
-    'script.js',
     'style.css',
     'local-ai-bridge.user.js',
 ];
-const FOLDERS = ['src', 'assets'];
+const FOLDERS = ['assets'];
+
+// Every local script the page loads. Ones fetched from a CDN are left to the CDN.
+function scriptsFromPage(pageFile) {
+    const html = fs.readFileSync(pageFile, 'utf8');
+    const found = [];
+    const pattern = /<script\b[^>]*\bsrc\s*=\s*["']([^"']+)["'][^>]*>/gi;
+    let match = pattern.exec(html);
+    while (match) {
+        if (!/^https?:|^\/\//i.test(match[1])) found.push(match[1]);
+        match = pattern.exec(html);
+    }
+    return found;
+}
+
+const scripts = scriptsFromPage('index.html');
+const files = EXTRA_FILES.concat(scripts);
+
+const missing = files.filter((file) => !fs.existsSync(file));
+if (missing.length) {
+    missing.forEach((file) => console.error(`missing ${file}`));
+    process.exit(1);
+}
 
 fs.rmSync(OUT, { recursive: true, force: true });
 fs.mkdirSync(OUT, { recursive: true });
 
-FILES.forEach((file) => {
-    if (!fs.existsSync(file)) {
-        console.error(`missing ${file}`);
-        process.exit(1);
-    }
-    fs.copyFileSync(file, path.join(OUT, file));
+files.forEach((file) => {
+    const destination = path.join(OUT, file);
+    fs.mkdirSync(path.dirname(destination), { recursive: true });
+    fs.copyFileSync(file, destination);
 });
 
 FOLDERS.forEach((folder) => {
@@ -37,8 +61,4 @@ FOLDERS.forEach((folder) => {
     fs.cpSync(folder, path.join(OUT, folder), { recursive: true });
 });
 
-const count = FILES.length + FOLDERS.reduce(
-    (total, folder) => total + (fs.existsSync(folder) ? fs.readdirSync(folder).length : 0),
-    0
-);
-console.log(`Copied ${count} files into ${OUT}/`);
+console.log(`Copied ${files.length} files and ${FOLDERS.length} folder(s) into ${OUT}/`);

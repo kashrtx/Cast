@@ -1,5 +1,31 @@
 /* Custom styles for Google Gemini Flash Character RolePlay */
 
+/* ---------------------------------------------------------------------------
+   The stacking order, in one place.
+
+   Every layer that floats above the page takes its z-index from here. It used
+   to be a dozen numbers scattered through this file, chosen one at a time, and
+   they had drifted out of order: the header sat at 51 on a narrow screen and
+   100 on a wide one, while both modals sat at 50. So the header covered the top
+   of the edit panel and the chat history panel, close button and all, and on a
+   phone the message box covered them too.
+
+   The rule is that a modal is above everything except the notices that report
+   on it, and that a number is only ever written here.
+   --------------------------------------------------------------------------- */
+:root {
+    --z-content: 1;          /* ordinary page content that needs its own layer */
+    --z-chat-input: 40;      /* the message box, above the page, below the sidebar */
+    --z-sidebar-scrim: 45;   /* the dark area behind the sidebar on a phone */
+    --z-sidebar: 50;         /* the character list, over the page on a phone */
+    --z-header: 60;          /* fixed, so it has to beat the page and the sidebar */
+    --z-reminder: 70;        /* the backup nudge, which sits under the header */
+    --z-modal: 1000;         /* the edit panel and the chat history panel */
+    --z-modal-head: 1001;    /* the sticky heading inside a modal */
+    --z-confirm: 1100;       /* asking before something is deleted, over a modal */
+    --z-toast: 1200;         /* notices, which have to be readable over all of it */
+}
+
 /* Utility classes */
 .hidden {
     display: none !important;
@@ -67,7 +93,7 @@ body.chat-view-active {
         left: 0;
         top: var(--header-h, 56px);
         bottom: 0;
-        z-index: 50;
+        z-index: var(--z-sidebar);
         transform: translateX(-100%);
         width: 280px;
         max-width: 90%; /* Ensure it doesn't exceed screen width */
@@ -125,7 +151,7 @@ body.chat-view-active {
         right: 0;
         bottom: 0;
         background-color: rgba(0, 0, 0, 0.5);
-        z-index: 45; /* Lower than sidebar but higher than other content */
+        z-index: var(--z-sidebar-scrim);
         display: none;
         opacity: 0;
         transition: opacity 0.3s ease;
@@ -150,7 +176,7 @@ body.chat-view-active {
         top: 0;
         left: 0;
         right: 0;
-        z-index: 51; /* Higher than sidebar */
+        z-index: var(--z-header);
         width: 100%;
         min-height: 52px; /* A floor rather than a fixed height, so the header can fit its contents */
 
@@ -1192,7 +1218,7 @@ button[id^="delete-msg-"] {
         background-color: white !important;
         border-top: 1px solid #e5e7eb !important;
         width: 100% !important;
-        z-index: 100 !important;
+        z-index: var(--z-chat-input) !important;
         box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1) !important;
     }
     /* --- END CONSOLIDATED CHAT INPUT AREA STYLES --- */
@@ -1247,7 +1273,7 @@ button[id^="delete-msg-"] {
 /* Send message container positioning */
 #chat-form {
     position: relative;
-    z-index: 40;
+    z-index: var(--z-chat-input);
     display: flex;
     align-items: center;
     background-color: white;
@@ -1269,7 +1295,7 @@ button[id^="delete-msg-"] {
     /* When the sidemenu is open, ensure the message container stays on top */
     #character-sidebar.sidebar-open + #chat-window #chat-input-container,
     #character-sidebar.sidebar-open + #chat-window .chat-input-container {
-        z-index: 60;
+        z-index: var(--z-chat-input);
     }
 }
 
@@ -1290,7 +1316,7 @@ button[id^="delete-msg-"] {
     top: 0;
     left: 0;
     right: 0;
-    z-index: 1000;
+    z-index: var(--z-reminder);
     margin: 0;
     border-radius: 0;
     padding: 1rem;
@@ -1352,7 +1378,7 @@ button[id^="delete-msg-"] {
         top: 0;
         left: 0;
         right: 0;
-        z-index: 100;
+        z-index: var(--z-header);
     }
 }
 
@@ -1827,7 +1853,7 @@ body.sidebar-hidden #reveal-sidebar-main { display: inline-flex; }
     transform: translateX(-50%);
     top: calc(var(--header-h, 56px) + 0.5rem);
     width: min(48rem, calc(100% - 2rem));
-    z-index: 75;
+    z-index: var(--z-reminder);
     margin: 0;
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
 }
@@ -1855,7 +1881,7 @@ body.sidebar-hidden #reveal-sidebar-main { display: inline-flex; }
     top: calc(var(--header-h, 56px) + 0.75rem);
     left: 50%;
     transform: translateX(-50%);
-    z-index: 200;
+    z-index: var(--z-toast);
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
@@ -2768,7 +2794,7 @@ button[id^="delete-msg-"] {
 .modal-sticky-head {
     position: sticky;
     top: -1.5rem;
-    z-index: 2;
+    z-index: var(--z-modal-head);
     background: inherit;
     padding-top: 0.25rem;
     padding-bottom: 0.75rem;
@@ -3382,3 +3408,153 @@ html.dark #chat-history-modal .bg-gray-50 {
     border-color: #262b36 !important;
     background: #1d212a !important;
 }
+
+
+/* ---------------------------------------------------------------------------
+   Modals sit on the ladder, not on a utility class.
+
+   Both panels were marked z-50 in the markup, which is below the header at 60
+   and below the message box on a phone. The result was a panel you could open
+   and then not close, because the control to close it was behind the header.
+   --------------------------------------------------------------------------- */
+#edit-character-modal,
+#chat-history-modal {
+    z-index: var(--z-modal);
+}
+
+/* Asking before a delete has to be answerable even when it was started from
+   inside a modal. */
+#cast-confirm-overlay {
+    z-index: var(--z-confirm) !important;
+}
+
+
+/* ---------------------------------------------------------------------------
+   Dark mode, swept.
+
+   The rules above this were added one at a time as each panel was noticed, which
+   is why some tinted surfaces stayed light: nobody had got to them yet. An audit
+   of every colour class used anywhere in the app found twenty six with no dark
+   rule at all, including the tinted result panels in Settings, the light grey
+   buttons, and the close control on the chat history panel.
+
+   This is the sweep. Every surface, border and tinted text colour the app uses
+   is listed here with its dark counterpart, grouped by what it is for rather
+   than by which screen it happened to be on. Adding a colour to the markup means
+   adding it here, and tests/dark-mode.test.js fails if you forget.
+
+   The palette is one step of lightness per surface, so a panel on a panel is
+   still readable, and tinted text is lightened rather than kept at its light
+   mode value, because a 600 weight on a dark background is unreadable.
+   --------------------------------------------------------------------------- */
+:root {
+    /* Neutral surfaces, lightest to darkest in light mode. */
+    --surface-raised: #ffffff;
+    --surface-1: #f9fafb;
+    --surface-2: #f3f4f6;
+    --surface-3: #e5e7eb;
+    --surface-4: #d1d5db;
+    --surface-inverse: #1f2937;
+
+    --line-1: #e5e7eb;
+    --line-2: #d1d5db;
+
+    --ink-1: #111827;
+    --ink-2: #374151;
+    --ink-3: #6b7280;
+    --ink-4: #9ca3af;
+
+    /* Tints, used for a result or a warning. A background and a matching text. */
+    --tint-blue-bg: #dbeafe;
+    --tint-blue-ink: #1d4ed8;
+    --tint-green-bg: #dcfce7;
+    --tint-green-ink: #15803d;
+    --tint-red-bg: #fee2e2;
+    --tint-red-ink: #b91c1c;
+    --tint-amber-ink: #d97706;
+    --tint-indigo-bg: #eef2ff;
+
+    /* Text that sits on a solid coloured button. White in both modes. */
+    --on-accent: #ffffff;
+}
+
+html.dark {
+    --surface-raised: #171a21;
+    --surface-1: #1d212a;
+    --surface-2: #22262f;
+    --surface-3: #2b303b;
+    --surface-4: #343a47;
+    --surface-inverse: #e5e7eb;
+
+    --line-1: #262b36;
+    --line-2: #333a47;
+
+    --ink-1: #e5e7eb;
+    --ink-2: #cbd2dc;
+    --ink-3: #9aa3b2;
+    --ink-4: #7c8494;
+
+    /* Tint backgrounds become a dark wash of the same hue rather than a pastel,
+       and the text is lightened to stay readable on it. */
+    --tint-blue-bg: #16263f;
+    --tint-blue-ink: #93c5fd;
+    --tint-green-bg: #14301f;
+    --tint-green-ink: #86efac;
+    --tint-red-bg: #3a1b1d;
+    --tint-red-ink: #fca5a5;
+    --tint-amber-ink: #fbbf24;
+    --tint-indigo-bg: #1b2036;
+}
+
+/* Neutral surfaces. */
+html.dark .bg-gray-200 { background-color: var(--surface-3) !important; }
+html.dark .bg-gray-300 { background-color: var(--surface-4) !important; }
+html.dark .bg-gray-400 { background-color: var(--surface-4) !important; }
+html.dark .bg-gray-800 { background-color: var(--surface-inverse) !important; color: var(--surface-1) !important; }
+html.dark .bg-indigo-50 { background-color: var(--tint-indigo-bg) !important; }
+
+/* Neutral borders. */
+html.dark .border-gray-200 { border-color: var(--line-1) !important; }
+html.dark .border-gray-300 { border-color: var(--line-2) !important; }
+
+/* Neutral text. A very light grey on white becomes a dim grey on dark, not
+   lighter still, or it glares. */
+html.dark .text-gray-300 { color: var(--ink-4) !important; }
+
+/* Tinted panels. These are the results in Settings: the provider test, the proxy
+   test, and the storage summary. Every one of them was a pastel panel with dark
+   text sitting on a dark page. */
+html.dark .bg-blue-100 { background-color: var(--tint-blue-bg) !important; color: var(--tint-blue-ink) !important; }
+html.dark .bg-green-100 { background-color: var(--tint-green-bg) !important; color: var(--tint-green-ink) !important; }
+html.dark .bg-red-100 { background-color: var(--tint-red-bg) !important; color: var(--tint-red-ink) !important; }
+
+/* Tinted text, wherever it sits. */
+html.dark .text-blue-500,
+html.dark .text-blue-600,
+html.dark .text-blue-700 { color: var(--tint-blue-ink) !important; }
+
+html.dark .text-green-600 { color: var(--tint-green-ink) !important; }
+
+html.dark .text-red-500,
+html.dark .text-red-600,
+html.dark .text-red-700 { color: var(--tint-red-ink) !important; }
+
+html.dark .text-amber-600 { color: var(--tint-amber-ink) !important; }
+
+/* A tinted panel that also carries its own text colour has to win over the
+   panel rule above, or the text is set twice and the last one in the file wins
+   by accident rather than on purpose. */
+html.dark .bg-blue-100.text-blue-700,
+html.dark .bg-green-100.text-green-700,
+html.dark .bg-red-100.text-red-700 { color: inherit !important; }
+
+/* Solid accents keep their colour in dark mode. A red delete button should look
+   like a red delete button, and white text on it is correct. They are listed so
+   the audit can see they were considered rather than missed. */
+html.dark .bg-red-500,
+html.dark .bg-red-600,
+html.dark .bg-green-500,
+html.dark .bg-amber-500 { color: var(--on-accent) !important; }
+
+/* The scrim behind a modal, and the border on a field that failed validation,
+   both read correctly as they are. */

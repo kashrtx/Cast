@@ -84,6 +84,12 @@
         const counts = summarise(data);
         const date = when instanceof Date ? when : new Date();
 
+        // Settings are copied into the file, and settings is also where the keys live. Leaving them
+        // in meant a backup taken with "include key in backups" turned off still had the key in it,
+        // one level down under settings, and anyone who sent that file to someone else sent their
+        // key with it. The switch now covers every place a key can be, not just the obvious one.
+        const settings = stripKeys(data.settings, includeApiKey);
+
         const payload = {
             // Named so a human opening the file can see what it is.
             app: brand && brand.name ? brand.name : "Cast",
@@ -97,7 +103,7 @@
             chatHistory: data.chatHistory || {},
             lastActiveChats: data.lastActiveChats || {},
             chatMembers: data.chatMembers || {},
-            settings: data.settings || {},
+            settings,
             personalContext: data.personalContext || {},
         };
 
@@ -106,6 +112,23 @@
         }
 
         return payload;
+    }
+
+    // Every field a key has ever been kept in. apiKeys is the current one, per provider. The others
+    // are from older versions and may still be present in settings loaded from an old backup.
+    const KEY_FIELDS = ["apiKeys", "apiKey", "geminiApiKey", "key"];
+
+    // Returns a copy of settings with the keys taken out, or the settings unchanged if the keys were
+    // asked for. Always a copy, so nothing here can alter the live settings.
+    function stripKeys(settings, includeApiKey) {
+        const looksLikeSettings = settings
+            && typeof settings === "object"
+            && !Array.isArray(settings);
+        if (!looksLikeSettings) return {};
+        const copy = Object.assign({}, settings);
+        if (includeApiKey) return copy;
+        KEY_FIELDS.forEach((field) => { delete copy[field]; });
+        return copy;
     }
 
     // Reads a backup file of any age and returns it in the current shape.

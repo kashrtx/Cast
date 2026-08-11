@@ -26,7 +26,7 @@
         dataVersion: 2,
 
         // The app version, shown in Settings.
-        appVersion: "2.21.1",
+        appVersion: "2.25.0",
     };
 
     return BRAND;

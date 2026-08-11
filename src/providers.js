@@ -647,8 +647,16 @@
     // page. "proxy" means it does not, so it cannot. "try-direct" means it is worth trying, and
     // falling back if the browser blocks it, because some providers have changed their minds
     // about this and a fixed answer would go stale.
+    // Takes either a provider or its id.
+    //
+    // It used to take only a provider. Handed a string it found no cors field and returned
+    // "try-direct", which is the least cautious answer of the three, so a provider that must be
+    // proxied would have been sent straight at the browser instead. Every caller in the app happened
+    // to pass a provider, so nothing was broken by it, but a helper whose wrong answer is the unsafe
+    // one should not depend on which of two shapes it was given.
     function corsPolicy(provider) {
-        return (provider && provider.cors) || "try-direct";
+        const config = typeof provider === "string" ? getProvider(provider) : provider;
+        return (config && config.cors) || "try-direct";
     }
 
     function alwaysNeedsProxy(provider) {
@@ -689,6 +697,26 @@
     //
     // A blocked request arrives as a TypeError with no status, because the response never
     // existed. That is the signature worth retrying through a proxy.
+    // Why a request cannot be made from a page opened straight off the disk.
+    //
+    // A provider that sends no CORS headers can only be reached through a proxy, and a proxy has to be
+    // a server. A file:// page has no server behind it, so there is nowhere to forward through and no
+    // amount of retrying will help. Every attempt comes back as "Failed to fetch" with no status,
+    // which reads like the app is broken.
+    //
+    // Returns the sentence to show, or an empty string when this is not the situation.
+    function fileUrlProxyProblem(pageProtocol, providerId, provider) {
+        if (pageProtocol !== "file:") return "";
+        const config = provider || getProvider(providerId);
+        if (!config) return "";
+        if (corsPolicy(config) !== "proxy") return "";
+
+        return `${config.label} does not accept requests made directly by a browser, so it has to go `
+            + "through a proxy, and a page opened straight from a file has no server behind it to be "
+            + "the proxy. Run the app with npm start and open the address it prints. The proxy is part "
+            + "of that server, and the app finds it without any setting.";
+    }
+
     function looksBlockedByBrowser(error) {
         if (!error) return false;
         const message = String(error.message || error).toLowerCase();
@@ -763,6 +791,7 @@
         canRetryThroughProxy,
         buildRequest,
         defaultProxyUrl,
+        fileUrlProxyProblem,
         looksBlockedByBrowser,
         characterUnavailableLine,
         localReachabilityHint,

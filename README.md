@@ -301,7 +301,7 @@ quicker than guessing from a failed chat.
 npm test
 ```
 
-338 tests, no dependencies to install. They use Node's own test runner.
+435 tests, no dependencies to install. They use Node's own test runner.
 
 They cover the parts that can run without a browser: separating reasoning from replies including
 streams split character by character, loading with every kind of damaged data, backup round trips
@@ -309,10 +309,83 @@ against a real file from 2025, markdown against the exact message that once rend
 provider registry and proxy routing, turn taking for group chats, notifications, the sliding
 navigation, ID generation, escaping, and picture sizing.
 
+Three of them are about the app as a whole rather than one piece of it, and they are the ones that
+catch the most:
+
+- **`tests/app-structure.test.js`** checks the way the code is arranged. Every script the page loads
+  exists, every file on disk is loaded by the page, no two files declare the same name, only
+  `src/app/boot.js` runs anything at load time, and nothing has grown past 800 lines. Most mistakes
+  in a pull request that adds a file are caught here.
+- **`tests/app-boot.test.js`** loads every file the page loads, in the same order, into a stand in for
+  a browser, and then starts the app. It starts it from nothing, from a realistic amount of data, and
+  from six kinds of damaged storage. It also compares every name the app defines against a recorded
+  list, so a function cannot quietly go missing.
+- **`tests/app-behaviour.test.js`** calls the app's own functions inside a started app and checks what
+  comes back: filtering and sorting, what actually gets sent to a model, a deleted message being
+  hidden but kept, a message becoming markup, replies going through the sanitiser, sending, and a
+  backup that can be read back in.
+
 Several exist specifically to replay old faults, so if one fails again you will know immediately.
 
-Anything involving real network calls, the picture store, or how things look needs a browser and a
-real key to check.
+The stand in for a browser is in `tools/domstub.js`. It is not a browser and does not try to be:
+nothing is laid out or drawn, so it says nothing about how the app looks. What it proves is that
+every file parses, that they work together, and that starting up runs to the end.
+
+Two things about it are worth knowing before you write a test against it, because both have already
+caused a test to pass while checking nothing:
+
+- **Asking for an element the page does not have gives `null`,** the same as in a browser. It did not
+  always: it used to hand back an element for any id asked for, which made every `if (element)` check
+  true and sent the app down branches a browser never takes. A test that names an id wrongly now fails
+  instead of quietly measuring an element nobody has.
+- **Values have to be brought across as JSON.** An array made inside the app is not the same kind of
+  array as one made in a test, so comparing the two directly fails even when the contents match. Use
+  `JSON.parse(run('JSON.stringify(...)'))`.
+
+Start up runs each step inside its own guard, so one failing does not stop the rest. That means
+nothing is thrown and a broken step can look like a clean start. `bootApp` reads the app's own log
+afterwards and reports them as `stepFailures`, which the tests check.
+
+Anything involving real network calls, the picture store, or how things look still needs a browser
+and a real key to check.
+
+## Running it locally, including the providers that block browsers
+
+```
+npm start
+```
+
+Then open the address it prints. This is the way to run it while working on it, and not only because
+it serves the files.
+
+Some providers will not accept a request that comes straight from a web page. NVIDIA NIM is the well
+known one: it sends no CORS headers, so the browser refuses to send the request at all and reports
+"Failed to fetch" with no status code. That reads like the app is broken when in fact nothing ever
+left your machine.
+
+The development server is also the proxy, at `/api/proxy`, which the app finds on its own with no
+setting to change. So NVIDIA NIM, Groq, Cerebras, Mistral, GitHub Models and the rest work on your own
+machine, and you no longer have to deploy the site to find out whether a provider works.
+
+Opening `index.html` straight from disk still works for everything else. It cannot work for those
+providers, and it never will: a `file://` page has no server behind it to be the proxy, so there is
+nowhere for the request to go. The app now says exactly that, and says to run `npm start`, rather than
+failing with a network error that looks like a bug.
+
+The rules about what may be forwarded where are in `proxy-rules.js`, shared by the development server
+and the Netlify function so the two cannot disagree. It is not an open proxy: it forwards only to the
+provider hosts listed in that file. Your key goes from your browser to your own proxy to the provider,
+and nowhere else, which is the reason to run your own rather than use a public CORS proxy.
+
+## Versions
+
+The number in Settings comes from `src/brand.js`. `package.json` carries the same one, and a test
+checks the two agree. Every release is written up in `CHANGELOG.md`, newest first, and a test fails if
+the top entry is not the version the app reports.
+
+What each part of the number means here: the last number is a fix with nothing else changed, the middle
+one is anything a person would notice, and the first would be a change that made old data unreadable,
+which has not happened and should not.
 
 ## The log
 
@@ -338,8 +411,14 @@ python3 verify-html.py index.html
 
 ## How the code is arranged
 
-It used to be one file of about 5,500 lines. The parts worth testing on their own now live in
-`src/`:
+It used to be one file of 8,301 lines. It is now about fifty files, none over 700, and each one says
+at the top what it is for. Nothing else about how the app works changed when it was split up.
+
+There are two layers. **`src/`** holds the pieces that stand on their own: each knows nothing about
+the rest of the app, each is tested directly, and each also loads under Node. **`src/app/`** is the
+app itself, grouped by what part of it you are working on.
+
+### The standalone pieces
 
 | File | What it handles |
 | --- | --- |
@@ -359,14 +438,90 @@ It used to be one file of about 5,500 lines. The parts worth testing on their ow
 | `src/providers.js` | The list of providers and how to talk to each |
 | `src/memory.js` | Summarising long chats without touching them |
 | `src/backup.js` | Filenames, reminders, and loading old files |
-| `script.js` | The app itself, the interface and the chat flow |
+
+### The app
+
+| File | What it handles |
+| --- | --- |
+| `src/app/state.js` | The two objects the whole app works from: your settings, and what is happening now |
+| `src/app/storage.js` | Reading and writing storage, and what to do when it will not fit |
+| `src/app/format.js` | Dates, sizes, and the debounce the search boxes use |
+| `src/app/notices.js` | Putting notifications on the screen |
+| `src/app/activity.js` | Writing and showing the log |
+| `src/app/ai/settings.js` | Which provider is in use, and what key, model and address it should use |
+| `src/app/ai/transport.js` | Getting a request out of the browser, and explaining it when it does not go |
+| `src/app/ai/client.js` | Asking a model for a reply |
+| `src/app/ai/context.js` | Building what the model actually receives |
+| `src/app/data/load.js` | Reading everything back at start up, whatever shape it is in |
+| `src/app/data/chats.js` | Which characters a chat belongs to |
+| `src/app/data/pictures.js` | Profile pictures, and keeping them out of the text storage |
+| `src/app/ui/theme.js` | Light, dark, and how wide the chat runs |
+| `src/app/ui/navigation.js` | Moving between the parts of the app |
+| `src/app/ui/sidebar.js` | The character list down the side |
+| `src/app/ui/home.js` | The first screen |
+| `src/app/ui/search.js` | Finding a character, and putting them in an order |
+| `src/app/characters/form.js` | Writing a character, and changing one later |
+| `src/app/characters/list.js` | Drawing the characters, and choosing who is in a chat |
+| `src/app/characters/remove.js` | Deleting a character, and everything that pointed at them |
+| `src/app/characters/enhance.js` | Turning a sentence about a character into a profile |
+| `src/app/chat/session.js` | Opening a chat, starting a new one, clearing one out |
+| `src/app/chat/history.js` | Keeping past conversations, and getting back into one |
+| `src/app/chat/messages.js` | Turning messages into what you see |
+| `src/app/chat/message-edit.js` | Changing a message after it was sent, and taking one back |
+| `src/app/chat/send.js` | Sending, and everything that happens while you wait |
+| `src/app/chat/respond.js` | Getting one character's reply, from the request to the words on screen |
+| `src/app/chat/compaction.js` | Keeping a long chat inside the token budget |
+| `src/app/settings/panel.js` | Settings that are not about a provider |
+| `src/app/settings/providers.js` | Choosing a provider and a model |
+| `src/app/settings/diagnostics.js` | The two buttons that answer "why is this not working" |
+| `src/app/backup/transfer.js` | Taking everything out as a file, and putting it back |
+| `src/app/backup/reminder.js` | A quiet nudge to take a backup |
+| `src/app/events.js` | Connecting the controls on the page to the code that runs |
+| `src/app/boot.js` | Starting the app. The only file that runs anything by itself |
+
+### Why plain scripts
 
 These are ordinary scripts loaded in order rather than ES modules, on purpose. It means opening
 `index.html` straight from disk still works, with no build step and nothing to install. Each file
 also loads under Node, which is how the tests run.
 
-The one piece of server code is `netlify/functions/ai-proxy.mjs`, which exists only for providers
-that refuse browser requests.
+Because they are plain scripts, every file shares one scope. Two files declaring the same name is
+not an error the browser reports: the second quietly replaces the first, and the first becomes code
+that looks live and never runs. That happened once, to `callGeminiAPI`, and a test now checks for it.
+
+Order matters in one way only. `src/app/state.js` comes first because everything reads from it, and
+`src/app/boot.js` comes last because it is the only file that runs anything at load time. Everything
+in between only declares functions, so it can be reordered freely. There is a test for that too.
+
+If you add a file, add it to `index.html`. The build reads its list of scripts from there, so nothing
+has to be kept in step by hand.
+
+### The one long function
+
+`getCharacterResponse` in `src/app/chat/respond.js` is about 550 lines and is the longest thing in the
+project. It is where the most can go wrong: a reply arrives a piece at a time, the chat can be closed
+or switched while it is still coming, the model can stop halfway, and the request can fail after some
+of the text is already on screen. Every way out of it, including the failures, has to remove the
+typing indicator and clear the pending flag, or the chat is left looking like it is still thinking.
+
+It has not been broken up because its parts share too much state to separate without changing
+behaviour, and a change there is felt by everyone using the app. If you take it on, the thing to
+check is what happens when a reply is interrupted, not what happens when it works.
+
+## The tools
+
+Small things in `tools/`, none of which the app needs to run:
+
+| File | What it does |
+| --- | --- |
+| `tools/domstub.js` | A pretend browser, complete enough to load and start the app under Node |
+| `tools/loadapp.js` | Loads the app the way the page does, reading the file list out of `index.html` |
+| `tools/chunker.js` | Splits a file into its top-level declarations, used by the structure tests |
+| `tools/record-globals.js` | Records every name the app defines, for `tests/app-boot.test.js` to compare against |
+| `tools/make-fixture.js` | Regenerates the test data in `tests/fixture-app-data.json` |
+
+The test data is generated rather than taken from a real export, because a fixture made from someone's
+actual backup would put their conversations in a public repository.
 
 ## What was fixed coming from Gemini Character Roleplay
 

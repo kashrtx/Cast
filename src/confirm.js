@@ -149,8 +149,30 @@
             noButton.addEventListener("click", () => finish(false));
 
             // Tapping the dark area outside cancels, which is what people expect.
+            //
+            // Both the press and the release have to land on the dark area. A click handler on its
+            // own also fires when a drag that started inside the box ends outside it, so selecting
+            // the text of the question and letting go cancelled the question.
+            let pressedOutside = false;
+
+            overlay.addEventListener("mousedown", (event) => {
+                pressedOutside = event.target === overlay;
+            });
+
+            overlay.addEventListener("touchstart", (event) => {
+                pressedOutside = event.target === overlay;
+            }, { passive: true });
+
             overlay.addEventListener("click", (event) => {
-                if (event.target === overlay) finish(false);
+                const releasedOutside = event.target === overlay;
+                const selecting = Boolean(
+                    typeof window !== "undefined"
+                    && window.getSelection
+                    && String(window.getSelection())
+                );
+
+                if (pressedOutside && releasedOutside && !selecting) finish(false);
+                pressedOutside = false;
             });
 
             document.addEventListener("keydown", onKeyDown, true);

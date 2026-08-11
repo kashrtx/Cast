@@ -281,6 +281,16 @@
                                     <p class="text-xs text-gray-500 mt-1">How long a reply can be. Raise this if replies are being cut off.</p>
                                     <p id="token-limit-warning" class="text-xs text-amber-600 mt-1 hidden"></p>
                                 </div>
+
+                                <div>
+                                    <label for="request-timeout" class="block text-gray-600 mb-2">
+                                        Give up after
+                                    </label>
+                                    <input type="number" id="request-timeout"
+                                        class="w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-primary"
+                                        min="1" max="600" value="150">
+                                    <p class="text-xs text-gray-500 mt-1">Seconds to wait for a reply before giving up and telling you. A very large model can take a while to start; raise this if you are being cut off while it is still thinking.</p>
+                                </div>
                             </div>
 
                             <div class="mt-6 border-t pt-4">
@@ -771,11 +781,11 @@
 
         <!-- Chat History Modal -->
         <div id="chat-history-modal"
-            class="fixed inset-0 bg-black bg-opacity-50 modal-scroll-overlay z-50 hidden p-4">
+            class="fixed inset-0 bg-black bg-opacity-50 modal-scroll-overlay hidden p-4">
             <div class="bg-white rounded-lg shadow-xl w-full max-w-md max-h-[90vh] flex flex-col">
                 <div class="p-4 border-b flex justify-between items-center">
                     <h3 class="text-lg font-bold text-gray-800">Chat History</h3>
-                    <button id="close-history-modal-btn" class="text-gray-500 hover:text-gray-700 p-2">
+                    <button id="close-history-modal-btn" class="modal-close-btn" aria-label="Close">
                         <i class="fas fa-times"></i>
                     </button>
                 </div>
@@ -872,7 +882,7 @@
 
     <!-- Edit Character Modal -->
     <div id="edit-character-modal"
-        class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden modal-scroll-overlay">
+        class="fixed inset-0 bg-black bg-opacity-50 hidden modal-scroll-overlay">
         <div class="bg-white rounded-2xl shadow-xl p-6 w-full edit-modal-panel">
             <div class="flex justify-between items-center mb-4 modal-sticky-head">
                 <h2 class="text-xl font-bold text-gray-800">Edit Character</h2>
@@ -951,12 +961,24 @@
         </div>
     </div>
 
-    <!-- The app is split into modules that each do one job.
-         These are ordinary scripts loaded in order rather than ES modules, which
-         keeps the app working when you open index.html straight from disk. Each
-         one also works under Node, which is how the tests run.
-         Order matters: brand and the small helpers first, then the pieces that
-         use them, then the app itself. -->
+    <!-- Every file the app needs, in the order it needs them.
+
+         These are ordinary scripts rather than ES modules, on purpose. It means opening
+         index.html straight from disk still works, with no build step and nothing to
+         install. Each file also loads under Node, which is how the tests run.
+
+         src/ holds the parts that stand on their own and are tested directly.
+         src/app/ is the app: the interface, the data and the chat flow.
+
+         Order matters in one way only. src/app/state.js has to come before the files
+         that read from it, and src/app/boot.js has to come last because it is the only
+         file that runs anything by itself. Everything between the two just declares
+         functions, so it can be reordered freely.
+
+         If you add a file, add it here too. tests/app-structure.test.js checks that
+         this list and the files on disk agree. -->
+
+    <!-- Standalone pieces, each with its own tests. -->
     <script src="src/brand.js"></script>
     <script src="src/ids.js"></script>
     <script src="src/escape.js"></script>
@@ -973,7 +995,59 @@
     <script src="src/providers.js"></script>
     <script src="src/memory.js"></script>
     <script src="src/backup.js"></script>
-    <script src="script.js"></script>
+
+    <!-- The app: shared data and the basics everything else uses. -->
+    <script src="src/app/state.js"></script>
+    <script src="src/app/storage.js"></script>
+    <script src="src/app/format.js"></script>
+    <script src="src/app/notices.js"></script>
+    <script src="src/app/activity.js"></script>
+
+    <!-- Talking to a model. -->
+    <script src="src/app/ai/settings.js"></script>
+    <script src="src/app/ai/transport.js"></script>
+    <script src="src/app/ai/client.js"></script>
+    <script src="src/app/ai/context.js"></script>
+
+    <!-- Loading, migrating and relating the stored data. -->
+    <script src="src/app/data/load.js"></script>
+    <script src="src/app/data/chats.js"></script>
+    <script src="src/app/data/pictures.js"></script>
+
+    <!-- The interface: theme, navigation, sidebar, home and search. -->
+    <script src="src/app/ui/theme.js"></script>
+    <script src="src/app/ui/navigation.js"></script>
+    <script src="src/app/ui/sidebar.js"></script>
+    <script src="src/app/ui/home.js"></script>
+    <script src="src/app/ui/search.js"></script>
+
+    <!-- Characters. -->
+    <script src="src/app/characters/form.js"></script>
+    <script src="src/app/characters/list.js"></script>
+    <script src="src/app/characters/remove.js"></script>
+    <script src="src/app/characters/enhance.js"></script>
+
+    <!-- Chats. -->
+    <script src="src/app/chat/session.js"></script>
+    <script src="src/app/chat/history.js"></script>
+    <script src="src/app/chat/messages.js"></script>
+    <script src="src/app/chat/message-edit.js"></script>
+    <script src="src/app/chat/send.js"></script>
+    <script src="src/app/chat/respond.js"></script>
+    <script src="src/app/chat/compaction.js"></script>
+
+    <!-- Settings. -->
+    <script src="src/app/settings/panel.js"></script>
+    <script src="src/app/settings/providers.js"></script>
+    <script src="src/app/settings/diagnostics.js"></script>
+
+    <!-- Backups. -->
+    <script src="src/app/backup/transfer.js"></script>
+    <script src="src/app/backup/reminder.js"></script>
+
+    <!-- Wiring up the page, then starting. This has to be last. -->
+    <script src="src/app/events.js"></script>
+    <script src="src/app/boot.js"></script>
 </body>
 
 </html>
