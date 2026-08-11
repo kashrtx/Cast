@@ -181,6 +181,31 @@ function isLocalProvider(providerId) {
     return id === "ollama" || id === "lmstudio";
 }
 
+// Whether the last request went through the proxy, so a failure can be attributed correctly.
+let lastRequestUsedProxy = false;
+
+// What went wrong, including the provider's own words.
+//
+// The generic message alone sent people to check the wrong setting. A 404 was always reported as a
+// bad model name, when it can equally mean the address is wrong or the request never reached the
+// provider at all. The response body usually says which.
+function describeProviderFailure(status, bodyText, provider) {
+    const base = CastProviders.describeFailure(status, '', provider);
+    const body = String(bodyText || '').trim();
+    if (!body) return base;
+
+    let detail = '';
+    try {
+        const parsed = JSON.parse(body);
+        const inner = parsed && parsed.error ? parsed.error : parsed;
+        detail = (inner && (inner.message || inner.detail || inner.title)) || '';
+    } catch (error) {
+        detail = body.slice(0, 160);
+    }
+
+    return detail ? `${base} It said: ${String(detail).slice(0, 200)}` : base;
+}
+
 // Where the proxy is, if there is one.
 //
 // A deployed site has the function sitting alongside it, so the address can be worked out.
@@ -215,7 +240,11 @@ async function fetchProvider(url, options, providerId) {
             viaProxy,
             headers: (options && options.headers) || {},
         });
-        return fetch(built.url, Object.assign({}, options, { headers: built.headers }));
+        lastRequestUsedProxy = built.viaProxy;
+        const response = await fetch(built.url, Object.assign({}, options, { headers: built.headers }));
+        // Carried on the response so the code reading it knows which route it took.
+        try { response.viaProxy = built.viaProxy; } catch (error) { /* some browsers seal this */ }
+        return response;
     };
 
     // Straight to the proxy when we already know a direct request will not work.
@@ -272,6 +301,35 @@ async function readErrorBody(response) {
     }
 }
 
+// Was this the proxy failing rather than the provider?
+//
+// The proxy always answers with JSON that names itself. A page of HTML, or anything else, means the
+// request reached the site but never reached the function, which almost always means it is not
+// deployed or not routed. That used to be reported as the provider rejecting the model name, which
+// sent people to check a setting that was perfectly fine.
+function describeProxyFailure(response, bodyText, proxyUrl) {
+    const body = String(bodyText || '');
+
+    let parsed = null;
+    try {
+        parsed = JSON.parse(body);
+    } catch (error) {
+        parsed = null;
+    }
+
+    // The proxy speaking for itself. Pass its own message along.
+    if (parsed && parsed.error && parsed.error.source === 'cast-proxy') {
+        return `The proxy refused: ${parsed.error.message}`;
+    }
+
+    // Anything that looks like a web page rather than an answer.
+    if (/^\s*<(!doctype|html)/i.test(body) || response.status === 404) {
+        return `The proxy at ${proxyUrl} is not responding. The site answered with ${response.status} instead of the function running. Check that netlify/functions is committed and that the deploy log shows the function being bundled.`;
+    }
+
+    return '';
+}
+
 // --- The one adapter that covers every OpenAI compatible service ---
 
 async function callOpenAiCompatible(messages, maxOutputTokens, providerId) {
@@ -298,7 +356,18 @@ async function callOpenAiCompatible(messages, maxOutputTokens, providerId) {
     }, provider.id);
 
     if (!response.ok) {
-        throw new Error(CastProviders.describeFailure(response.status, await readErrorBody(response), provider));
+        const body = await readErrorBody(response);
+
+        // If this went through the proxy, the failure may be the proxy rather than the provider.
+        if (response.viaProxy || lastRequestUsedProxy) {
+            const proxyProblem = describeProxyFailure(response, body, getProxyUrl());
+            if (proxyProblem) {
+                recordActivityIfReady(CastLog.KINDS.PROXY_FAILED, proxyProblem);
+                throw new Error(proxyProblem);
+            }
+        }
+
+        throw new Error(describeProviderFailure(response.status, body, provider));
     }
 
     const payload = await response.json();
@@ -367,7 +436,15 @@ async function fetchModelSuggestions(providerId, options) {
     const response = await fetchProvider(url, { headers }, provider.id);
 
     if (!response.ok) {
-        throw new Error(CastProviders.describeFailure(response.status, await readErrorBody(response), provider));
+        const body = await readErrorBody(response);
+        if (lastRequestUsedProxy) {
+            const proxyProblem = describeProxyFailure(response, body, getProxyUrl());
+            if (proxyProblem) {
+                recordActivityIfReady(CastLog.KINDS.PROXY_FAILED, proxyProblem);
+                throw new Error(proxyProblem);
+            }
+        }
+        throw new Error(describeProviderFailure(response.status, body, provider));
     }
 
     const payload = await response.json();
@@ -634,9 +711,12 @@ function recordStorageProblem(problem) {
     if (!problem) return;
     storageProblems.push(problem);
     console.warn(`Storage problem on ${problem.key}: ${problem.detail}`);
+    recordActivityIfReady(CastLog.KINDS.DATA_SET_ASIDE, `${problem.key}: ${problem.detail}`);
 }
 
 function reportSaveFailure(key, result) {
+    recordActivityIfReady(CastLog.KINDS.SAVE_FAILED, `${key} could not be written: ${result.reason}`);
+
     if (result.reason === "quota") {
         showError("There is no room left in this browser's storage, so that change was not saved. Open Settings and use Storage to see what is taking up space, then save a backup before clearing anything.");
         return;
@@ -668,6 +748,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             return true;
         } catch (error) {
             console.error(`Start up step "${name}" failed:`, error);
+            recordActivityIfReady(CastLog.KINDS.STARTUP_FAILED, `${name}: ${error.message}`);
             bootFailures.push({ name, error });
             return false;
         }
@@ -697,6 +778,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     bootStep('set up search', setupSearchBoxes);
     bootStep('set up the edit panel', setupEditModalExtras);
     bootStep('apply the chat layout', setupChatLayoutChoice);
+    bootStep('apply the theme', setupThemeChoice);
     bootStep('draw the home screen', () => renderChatHome(''));
     bootStep('set up settings', initializeModelSettings);
     bootStep('show last backup time', updateLastBackupStatus);
@@ -1020,6 +1102,53 @@ function clearSidebarSearch() {
 }
 
 // Search, on both the home screen and the list beside a chat.
+// Light or dark.
+//
+// Three settings rather than two, because following the device is what most people want and a fixed
+// choice is what the rest want. The class is put on the html element by a small script in the page
+// head as well, before anything is drawn, so the light theme never flashes before the dark one
+// arrives.
+function getTheme() {
+    const stored = castStore.read(CastStorage.KEYS.UI_STATE, "object");
+    const ui = stored.value || {};
+    return ['auto', 'light', 'dark'].includes(ui.theme) ? ui.theme : 'auto';
+}
+
+function prefersDarkDevice() {
+    return Boolean(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+}
+
+function applyTheme(theme) {
+    const chosen = ['auto', 'light', 'dark'].includes(theme) ? theme : 'auto';
+    const dark = chosen === 'dark' || (chosen === 'auto' && prefersDarkDevice());
+    document.documentElement.classList.toggle('dark', dark);
+    return chosen;
+}
+
+function setupThemeChoice() {
+    const current = getTheme();
+    applyTheme(current);
+
+    const select = document.getElementById('theme-select');
+    if (select) {
+        select.value = current;
+        select.addEventListener('change', () => {
+            const stored = castStore.read(CastStorage.KEYS.UI_STATE, "object");
+            const ui = Object.assign({}, stored.value || {}, { theme: select.value });
+            castStore.write(CastStorage.KEYS.UI_STATE, ui);
+            applyTheme(select.value);
+        });
+    }
+
+    // Follow the device as it changes, which matters for anyone whose system switches at sunset.
+    if (window.matchMedia) {
+        const query = window.matchMedia('(prefers-color-scheme: dark)');
+        const onChange = () => { if (getTheme() === 'auto') applyTheme('auto'); };
+        if (query.addEventListener) query.addEventListener('change', onChange);
+        else if (query.addListener) query.addListener(onChange);
+    }
+}
+
 // Which chat layout is in use.
 //
 // Modern is the board of characters. Classic is the list down the side, kept because it is
@@ -1046,6 +1175,56 @@ function applyChatLayout(mode) {
     }
 
     return layout;
+}
+
+// Asks the proxy whether it is there.
+//
+// Worth having as its own button, because a chat failing tells you almost nothing about which link
+// in the chain broke. This asks the proxy directly and reports exactly what came back.
+async function testProxy() {
+    const status = document.getElementById('proxy-status');
+    const button = document.getElementById('test-proxy-btn');
+    const proxyUrl = getProxyUrl();
+
+    const say = (text, tone) => {
+        if (!status) return;
+        status.textContent = text;
+        status.className = `text-xs mt-1 ${tone}`;
+    };
+
+    if (!proxyUrl) {
+        say('There is no proxy address. Opening the file directly means there is no server to run one, so deploy the app or set an address above.', 'text-amber-600');
+        return;
+    }
+
+    if (button) { button.disabled = true; button.textContent = 'Testing...'; }
+    say(`Asking ${proxyUrl}...`, 'text-gray-500');
+
+    try {
+        // No target on purpose. A working proxy replies with a complaint about that, which is proof
+        // it is running.
+        const response = await fetch(proxyUrl, { method: 'POST' });
+        const body = await response.text();
+
+        let parsed = null;
+        try { parsed = JSON.parse(body); } catch (error) { parsed = null; }
+
+        if (parsed && parsed.error && parsed.error.source === 'cast-proxy') {
+            say(`Working. The proxy answered from ${proxyUrl}, so providers that need it should work.`, 'text-green-600');
+            return;
+        }
+
+        if (/^\s*<(!doctype|html)/i.test(body) || response.status === 404) {
+            say(`Not deployed. ${proxyUrl} returned ${response.status} and a web page rather than the function. Check that netlify/functions is committed and that the deploy log mentions bundling ai-proxy.`, 'text-red-600');
+            return;
+        }
+
+        say(`Something answered at ${proxyUrl} with ${response.status}, but it was not the proxy. First part of the reply: ${body.slice(0, 120)}`, 'text-amber-600');
+    } catch (error) {
+        say(`Could not reach ${proxyUrl} at all. ${error.message}`, 'text-red-600');
+    } finally {
+        if (button) { button.disabled = false; button.textContent = 'Test the proxy'; }
+    }
 }
 
 function setupChatLayoutChoice() {
@@ -1785,6 +1964,17 @@ function getChatCharacters(chatId) {
 // Called from the places that change your data, so the log in Settings is a real record
 // rather than a guess. Saving is put off for a moment so a burst of changes does not
 // mean a burst of writes.
+// Safe to call at any point, including before the log has been read from storage and from inside an
+// error handler. A failure while recording a failure would be a poor way to lose the record of it.
+function recordActivityIfReady(kind, detail) {
+    try {
+        if (!state || !Array.isArray(state.activityLog)) return;
+        recordActivity(kind, detail);
+    } catch (error) {
+        console.warn('Could not record that in the log:', error);
+    }
+}
+
 function recordActivity(kind, detail) {
     state.activityLog = CastLog.append(state.activityLog, kind, detail);
 
@@ -2121,6 +2311,7 @@ function installFailsafeErrorReporting() {
     window.addEventListener('error', (event) => {
         const message = event && event.message ? event.message : 'Something went wrong.';
         console.error('Uncaught error:', event);
+        recordActivityIfReady(CastLog.KINDS.UNCAUGHT_ERROR, `${message} at ${event && event.filename ? event.filename.split('/').pop() : 'unknown'}:${(event && event.lineno) || '?'}`);
         showError(`Something broke: ${message}. Your data is safe. Reloading usually clears it.`);
     });
 
@@ -2128,6 +2319,7 @@ function installFailsafeErrorReporting() {
         const reason = event && event.reason;
         const message = reason && reason.message ? reason.message : String(reason || 'unknown');
         console.error('Unhandled rejection:', reason);
+        recordActivityIfReady(CastLog.KINDS.UNCAUGHT_ERROR, message);
         showError(`Something broke: ${message}. Your data is safe. Reloading usually clears it.`);
     });
 }
@@ -2166,7 +2358,7 @@ function addCharacterUnavailableReply(chatId, character, error) {
     });
 
     setStoredItem(STORAGE_KEYS.CHATS, state.chats);
-    recordActivity('reply failed', described.short);
+    recordActivity(CastLog.KINDS.REPLY_FAILED, described.short);
 
     if (state.activeChat === chatId) updateChatMessages();
 
@@ -2193,7 +2385,7 @@ function showChatError(chatId, characterId, message) {
     });
 
     setStoredItem(STORAGE_KEYS.CHATS, state.chats);
-    recordActivity('reply failed', message.slice(0, 120));
+    recordActivity(CastLog.KINDS.REPLY_FAILED, message.slice(0, 120));
 
     if (state.activeChat === chatId) updateChatMessages();
 }
@@ -2367,6 +2559,7 @@ function createNewCharacter() {
             })
             .catch(error => {
                 console.warn("That picture could not be saved:", error);
+                recordActivityIfReady(CastLog.KINDS.PICTURE_PROBLEM, `could not save the picture for ${newCharacter.name}: ${error.message}`);
                 showError("The character was saved but the picture could not be. Try a different image.");
             });
     }
@@ -3359,6 +3552,7 @@ async function deleteMessage(messageId) {
         const preview = String(target.content || "").trim().replace(/\s+/g, " ");
         const shortened = preview.length > 70 ? `${preview.slice(0, 70)}...` : preview;
 
+        recordActivityIfReady(CastLog.KINDS.MESSAGE_DELETED, '');
         const confirmed = await CastConfirm.ask({
             title: "Delete this message?",
             message: shortened ? `"${shortened}"` : "This message will be removed from the chat.",
@@ -4059,6 +4253,8 @@ async function deleteChatHistory(chatId, historyKey) {
     });
 
     if (!confirmed) return;
+
+    recordActivity(CastLog.KINDS.CHAT_DELETED, `${liveCount} messages`);
 
     // Check if this is the currently active chat
     const isActiveChatDeleted = (state.activeChat === chatId);
@@ -5266,6 +5462,7 @@ async function maybeCompactChat(chatId, character) {
             messageCount: plan.toSummarise.length,
         }));
 
+        recordActivity(CastLog.KINDS.SUMMARY_MADE, `${plan.toSummarise.length} messages folded in, was roughly ${decision.tokens} tokens a turn`);
         console.log(`Summarised ${plan.toSummarise.length} older messages in this chat. Roughly ${decision.tokens} tokens a turn before.`);
         updateMemoryPanel();
     } catch (error) {
@@ -5671,6 +5868,7 @@ async function enhanceCharacterContext(characterId) {
         setStoredItem(STORAGE_KEYS.CHARACTERS, state.characters);
 
         // Show success message
+        recordActivity(CastLog.KINDS.CHARACTER_ENHANCED, `${character.name}, ${enhancedContext.length} characters`);
         showSuccess(`Character ${character.name} has been enhanced!`);
 
         // Update the container of this specific character if it exists
@@ -6520,6 +6718,7 @@ function initializeModelSettings() {
             // model across, so read the fields before the provider changes and
             // then refresh them for the new one.
             appSettings.provider = CastProviders.getProvider(providerSelect.value).id;
+            recordActivityIfReady(CastLog.KINDS.SETTINGS_CHANGED, `provider set to ${getProviderDisplayName()}`);
             saveAppSettings({ reinitialize: false });
             markProviderConnectionDirty();
             updateProviderSettingsVisibility();
@@ -6536,6 +6735,11 @@ function initializeModelSettings() {
 
     if (loadModelsBtn) {
         loadModelsBtn.addEventListener('click', loadModelSuggestions);
+    }
+
+    const testProxyBtn = document.getElementById('test-proxy-btn');
+    if (testProxyBtn) {
+        testProxyBtn.addEventListener('click', testProxy);
     }
 
     if (temperatureRange && temperatureValue) {
@@ -6639,20 +6843,82 @@ function renderActivityLog() {
 
     const lastBackupAt = state.backupState ? state.backupState.lastBackupAt : null;
 
-    panel.innerHTML = entries.map(entry => {
+    const shown = showOnlyFailures ? CastLog.failuresOnly(state.activityLog) : entries;
+
+    if (!shown.length) {
+        panel.innerHTML = showOnlyFailures
+            ? '<p class="text-gray-500">No failures recorded. That is the good outcome.</p>'
+            : '<p class="text-gray-500">Nothing recorded yet.</p>';
+        return;
+    }
+
+    panel.innerHTML = shown.map(entry => {
+        const level = entry.level || CastLog.levelOf(entry.kind);
         const isSinceBackup = lastBackupAt && String(entry.at) > String(lastBackupAt);
-        const colour = isSinceBackup ? 'text-gray-800' : 'text-gray-400';
+
         const detail = entry.detail
-            ? ` <span class="text-gray-500">${CastEscape.escapeHtml(entry.detail)}</span>`
+            ? ` <span class="log-detail">${CastEscape.escapeHtml(entry.detail)}</span>`
             : '';
-        return `<div class="${colour}">`
-            + `<span class="text-gray-400">${CastEscape.escapeHtml(CastLog.formatTime(entry.at))}</span> `
-            + `${CastEscape.escapeHtml(entry.kind)}${detail}`
+
+        return `<div class="log-line log-${level}${isSinceBackup ? ' log-recent' : ''}">`
+            + `<span class="log-time">${CastEscape.escapeHtml(CastLog.formatTime(entry.at))}</span>`
+            + `<span class="log-kind">${CastEscape.escapeHtml(entry.kind)}</span>`
+            + detail
             + `</div>`;
     }).join('');
 }
 
+// Whether the log is filtered to failures.
+let showOnlyFailures = false;
+
 function setupActivityLogToggle() {
+    const failuresBtn = document.getElementById('activity-log-failures');
+    if (failuresBtn) {
+        failuresBtn.addEventListener('click', () => {
+            showOnlyFailures = !showOnlyFailures;
+            failuresBtn.textContent = showOnlyFailures ? 'Show everything' : 'Failures only';
+            failuresBtn.className = showOnlyFailures
+                ? 'text-xs text-primary font-semibold underline'
+                : 'text-xs text-gray-600 hover:text-primary underline';
+            renderActivityLog();
+        });
+    }
+
+    // Copying the whole log matters because the useful thing to do with a log is give it to
+    // somebody who can read it.
+    const copyBtn = document.getElementById('activity-log-copy');
+    if (copyBtn) {
+        copyBtn.addEventListener('click', async () => {
+            const header = [
+                `${CastBrand.name} ${CastBrand.appVersion}`,
+                `Provider: ${getProviderDisplayName()}, model ${getModelFor()}`,
+                `Page: ${window.location.origin || 'opened from a file'}`,
+                `Proxy: ${getProxyUrl() || 'none'}`,
+                '',
+            ].join('\n');
+
+            const text = header + CastLog.asText(state.activityLog);
+
+            try {
+                await navigator.clipboard.writeText(text);
+                notify('Log copied, including which provider and version you are on.', 'success');
+            } catch (error) {
+                // Clipboard access can be refused, so fall back to selecting it for copying by hand.
+                const panel = document.getElementById('activity-log');
+                if (panel) {
+                    const range = document.createRange();
+                    range.selectNodeContents(panel);
+                    const selection = window.getSelection();
+                    selection.removeAllRanges();
+                    selection.addRange(range);
+                    notify('Could not reach the clipboard, so the log has been selected for you to copy.', 'warning');
+                } else {
+                    notify(`Could not copy: ${error.message}`, 'error');
+                }
+            }
+        });
+    }
+
     const button = document.getElementById('activity-log-toggle');
     const panel = document.getElementById('activity-log');
     const chevron = document.getElementById('activity-log-chevron');
@@ -7599,6 +7865,11 @@ function importAppData() {
                 const problemNote = checked.problems.length
                     ? ` Some parts were skipped: ${checked.problems.slice(0, 3).join(' ')}`
                     : '';
+
+                recordActivity(CastLog.KINDS.BACKUP_LOADED, `${incoming.characterCount} characters, ${incoming.chatCount} chats, ${incoming.messageCount} messages`);
+                if (checked.problems.length) {
+                    recordActivity(CastLog.KINDS.IMPORT_PROBLEM, checked.problems.slice(0, 3).join(' '));
+                }
 
                 showSuccess(`Loaded ${incoming.characterCount} characters and ${incoming.chatCount} chats.${pictureNote}${problemNote} Reloading...`, 4000);
 

@@ -155,6 +155,8 @@ export default async (request) => {
     });
 };
 
-export const config = {
-    path: '/api/proxy',
-};
+// Deliberately no path config here.
+//
+// Declaring a custom path and also having a redirect in netlify.toml means two mechanisms trying
+// to route the same address, and the result was a 404 from the site rather than the function ever
+// running. The function stays at its default address and the redirect provides the tidy one.

@@ -40,16 +40,60 @@
         SETTINGS_CHANGED: "settings changed",
         DATA_SET_ASIDE: "data set aside",
         SUMMARY_MADE: "conversation summarised",
+
+        // Failures. These are the reason to keep a log at all, so they are named plainly.
+        REPLY_FAILED: "reply failed",
+        SAVE_FAILED: "save failed",
+        PROXY_FAILED: "proxy failed",
+        STARTUP_FAILED: "start up problem",
+        UNCAUGHT_ERROR: "unexpected error",
+        IMPORT_PROBLEM: "backup partly skipped",
+        PICTURE_PROBLEM: "picture problem",
     };
+
+    // How serious each kind is.
+    //
+    // Without this the log is a flat wall of lines where a failure looks the same as a character
+    // being renamed, which defeats the point of looking at it when something has gone wrong.
+    const LEVELS = {
+        "reply failed": "error",
+        "save failed": "error",
+        "proxy failed": "error",
+        "unexpected error": "error",
+        "start up problem": "error",
+        "data set aside": "warn",
+        "backup partly skipped": "warn",
+        "picture problem": "warn",
+        "settings changed": "info",
+    };
+
+    function levelOf(kind) {
+        return LEVELS[String(kind)] || "info";
+    }
+
+    function isFailure(entry) {
+        return entry ? levelOf(entry.kind) === "error" : false;
+    }
 
     // Which entries are worth counting as unsaved work, for the backup reminder.
     // Saving or loading a backup is not itself a change to your data.
-    const NOT_A_CHANGE = new Set([KINDS.BACKUP_SAVED, KINDS.BACKUP_LOADED]);
+    const NOT_A_CHANGE = new Set([
+        KINDS.BACKUP_SAVED,
+        KINDS.BACKUP_LOADED,
+        // A failure is not unsaved work, so it should not push you towards making a backup.
+        KINDS.REPLY_FAILED,
+        KINDS.SAVE_FAILED,
+        KINDS.PROXY_FAILED,
+        KINDS.STARTUP_FAILED,
+        KINDS.UNCAUGHT_ERROR,
+    ]);
 
     function makeEntry(kind, detail, when) {
+        const name = String(kind || "something happened");
         return {
             at: (when instanceof Date ? when : new Date()).toISOString(),
-            kind: String(kind || "something happened"),
+            kind: name,
+            level: levelOf(name),
             detail: String(detail || ""),
         };
     }
@@ -62,10 +106,25 @@
     }
 
     // Newest first, which is the order you want to read a log in.
+    //
+    // Sorting on the timestamp alone is not enough. Several things can happen in the same
+    // millisecond, for example a burst of characters being added while a backup is loading, and
+    // those entries then have identical timestamps. A sort cannot separate them, so they kept
+    // their insertion order and came out oldest first, which is the opposite of what this
+    // promises.
+    //
+    // Entries are appended in order, so the position in the array is itself a record of what
+    // happened first. Using it as the tie breaker makes the order correct and predictable.
     function newestFirst(entries) {
-        return (Array.isArray(entries) ? entries : [])
-            .slice()
-            .sort((a, b) => String(b.at).localeCompare(String(a.at)));
+        const list = Array.isArray(entries) ? entries : [];
+        return list
+            .map((entry, index) => ({ entry, index }))
+            .sort((a, b) => {
+                const byTime = String(b.entry.at).localeCompare(String(a.entry.at));
+                if (byTime !== 0) return byTime;
+                return b.index - a.index;
+            })
+            .map((wrapped) => wrapped.entry);
     }
 
     // Everything that happened after a given moment, used to show what has changed
@@ -112,8 +171,30 @@
         return `${day} ${clock}`;
     }
 
+    // The whole log as plain text, so it can be copied and pasted when asking for help.
+    function asText(entries) {
+        const list = newestFirst(entries);
+        if (!list.length) return "Nothing recorded yet.";
+
+        return list.map((entry) => {
+            const level = entry.level && entry.level !== "info" ? ` [${entry.level}]` : "";
+            const detail = entry.detail ? ` ${entry.detail}` : "";
+            return `${formatTime(entry.at)}${level} ${entry.kind}${detail}`;
+        }).join("\n");
+    }
+
+    // Just the failures, for when something has gone wrong and the rest is noise.
+    function failuresOnly(entries) {
+        return newestFirst(entries).filter(isFailure);
+    }
+
     return {
         MAX_ENTRIES,
+        LEVELS,
+        levelOf,
+        isFailure,
+        asText,
+        failuresOnly,
         KINDS,
         NOT_A_CHANGE,
         makeEntry,

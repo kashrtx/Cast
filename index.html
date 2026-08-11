@@ -24,6 +24,13 @@
                 var layout = ui && ui.chatLayout === 'classic' ? 'classic' : 'modern';
                 var root = document.documentElement;
                 root.className += ' layout-' + layout;
+
+                // Dark mode, before anything is painted, so the light theme never flashes first.
+                var theme = (ui && ui.theme) || 'auto';
+                var wantsDark = theme === 'dark' || (theme === 'auto'
+                    && window.matchMedia
+                    && window.matchMedia('(prefers-color-scheme: dark)').matches);
+                if (wantsDark) root.className += ' dark';
                 if (ui && ui.sidebarHidden && layout === 'classic') {
                     root.className += ' sidebar-hidden';
                 }
@@ -195,6 +202,12 @@
                                     <label for="proxy-url-input" class="block text-gray-600 mb-2">Proxy address</label>
                                     <input type="url" id="proxy-url-input" spellcheck="false" placeholder="Worked out automatically"
                                         class="w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-primary" />
+                                    <div class="flex items-center gap-2 mt-2">
+                                        <button type="button" id="test-proxy-btn"
+                                            class="text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1.5 rounded transition">
+                                            Test the proxy
+                                        </button>
+                                    </div>
                                     <p id="proxy-status" class="text-xs text-gray-500 mt-1"></p>
                                     <p class="text-xs text-gray-500 mt-1">
                                         Some providers will not accept requests sent straight from a web page. Those go
@@ -321,6 +334,20 @@
 
                         <div class="settings-card">
                             <h3 class="text-lg font-semibold mb-3 text-gray-700">Chat behaviour</h3>
+
+                            <label for="theme-select" class="block text-gray-600 mb-2">Appearance</label>
+                            <select id="theme-select"
+                                class="w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-primary">
+                                <option value="auto">Match my device</option>
+                                <option value="light">Always light</option>
+                                <option value="dark">Always dark</option>
+                            </select>
+                            <p class="text-xs text-gray-500 mt-1 mb-3">
+                                Matching your device follows it as it changes, including at sunset if your system does
+                                that.
+                            </p>
+
+                            <hr class="settings-divider">
                             <p class="text-gray-600 mb-3 text-sm">
                                 How the chat page is arranged.
                             </p>
@@ -412,11 +439,11 @@
                         </div>
 
                         <div class="settings-card">
-                            <h3 class="text-lg font-semibold mb-3 text-gray-700">Storage and app</h3>
-                            <div class="flex items-center justify-between mb-3">
+                            <h3 class="text-lg font-semibold mb-3 text-gray-700 settings-card-heading">
+                                <span>Storage and app</span>
                                 <button type="button" id="refresh-storage-btn"
-                                    class="text-sm text-primary hover:underline">Refresh</button>
-                            </div>
+                                    class="settings-card-action">Refresh</button>
+                            </h3>
                             <p class="mb-4 text-gray-600">
                                 A browser only gives this page a few megabytes for text. Pictures are kept somewhere
                                 roomier so they cannot push your chats out.
@@ -439,25 +466,40 @@
                     </div>
 
 <div class="settings-card settings-wide" id="local-ai-bridge-settings">
-                            <h3 class="text-lg font-semibold mb-3 text-gray-700">Using a model on your own machine</h3>
+                            <h3 class="text-lg font-semibold mb-3 text-gray-700">Running the AI on your own computer</h3>
                             <p class="text-gray-600 mb-3">
-                                A browser will not let a page on the open internet quietly reach into your own machine.
-                                What you need depends on where this page is: nothing at all if you opened it from a file
-                                or from localhost, a one time permission if you are on the deployed site reaching the same
-                                computer, and the bridge below if you are on a phone reaching your computer across the
-                                network.
+                                Ollama and LM Studio run a model on your own computer. Free, private, and no key needed.
+                                Pick one of them as the provider above.
                             </p>
-                            <ol class="list-decimal pl-5 space-y-2 text-sm text-gray-600">
-                                <li>Install Tampermonkey in the browser that opens this app.</li>
-                                <li><a href="local-ai-bridge.user.js" target="_blank" rel="noopener noreferrer" class="text-primary underline">Install the Local AI Bridge userscript</a>.</li>
-                                <li>Keep your phone and PC on the same Wi-Fi.</li>
-                                <li>Start Ollama or LM Studio with local-network access enabled on the PC.</li>
-                                <li>Use your PC LAN IP endpoint, such as <code class="bg-gray-100 px-1 rounded">http://192.168.1.25:11434</code> for Ollama or <code class="bg-gray-100 px-1 rounded">http://192.168.1.25:1234/v1</code> for LM Studio.</li>
-                                <li>Click Test Configuration before chatting.</li>
+
+                            <p class="font-semibold text-gray-700 mt-1 mb-1">On the same computer</p>
+                            <p class="text-gray-600 mb-3">
+                                Nothing to set up. Start Ollama or LM Studio and press Check the connection. If it fails,
+                                Ollama needs the environment variable <code>OLLAMA_ORIGINS=*</code> before it will accept
+                                requests from a browser. LM Studio accepts them already.
+                            </p>
+
+                            <p class="font-semibold text-gray-700 mt-3 mb-1">From your phone, to a model on your computer</p>
+                            <p class="text-gray-600 mb-2">
+                                This needs a helper, because a web page is not allowed to reach across your network on its
+                                own. It only works in a browser that supports extensions, which means Orion on iOS, or
+                                Firefox, Orion or Edge Canary on Android. Safari and Chrome on mobile cannot do it.
+                            </p>
+                            <ol class="list-decimal ml-5 space-y-1 text-gray-600 mb-3">
+                                <li>Install Tampermonkey in that browser</li>
+                                <li><a href="local-ai-bridge.user.js" class="text-primary underline" target="_blank" rel="noopener noreferrer">Install the Cast Local AI Bridge script</a></li>
+                                <li>Keep the phone and the computer on the same wifi</li>
+                                <li>Start Ollama or LM Studio so it listens on your network, not only on localhost</li>
+                                <li>Set the address above to your computer's address, such as
+                                    <code>http://192.168.1.25:11434</code>, because on a phone
+                                    <code>localhost</code> means the phone</li>
                             </ol>
-                            <p id="local-bridge-status" class="mt-3 text-xs text-gray-500">
-                                Bridge status: not detected in this browser yet.
+
+                            <p class="text-xs text-gray-500">
+                                If none of this appeals, the hosted providers above need nothing installed and several are
+                                free.
                             </p>
+                        
                         </div>
 
 <div class="settings-card settings-wide" id="activity-log-card">
@@ -468,6 +510,14 @@
                                 </h3>
                                 <div class="flex items-center gap-3">
                                     <span id="activity-log-summary" class="text-xs text-gray-500"></span>
+                                    <button type="button" id="activity-log-failures"
+                                        class="text-xs text-gray-600 hover:text-primary underline">
+                                        Failures only
+                                    </button>
+                                    <button type="button" id="activity-log-copy"
+                                        class="text-xs text-gray-600 hover:text-primary underline">
+                                        Copy
+                                    </button>
                                     <button type="button" id="activity-log-toggle"
                                         class="text-sm text-primary hover:underline flex items-center gap-1">
                                         <i class="fas fa-chevron-down text-xs" id="activity-log-chevron"></i>
@@ -721,7 +771,7 @@
 
         <!-- Chat History Modal -->
         <div id="chat-history-modal"
-            class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden p-4">
+            class="fixed inset-0 bg-black bg-opacity-50 modal-scroll-overlay z-50 hidden p-4">
             <div class="bg-white rounded-lg shadow-xl w-full max-w-md max-h-[90vh] flex flex-col">
                 <div class="p-4 border-b flex justify-between items-center">
                     <h3 class="text-lg font-bold text-gray-800">Chat History</h3>
@@ -822,11 +872,11 @@
 
     <!-- Edit Character Modal -->
     <div id="edit-character-modal"
-        class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden p-4">
-        <div class="bg-white rounded-2xl shadow-xl p-6 w-full mx-auto edit-modal-panel">
-            <div class="flex justify-between items-center mb-4">
+        class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden modal-scroll-overlay">
+        <div class="bg-white rounded-2xl shadow-xl p-6 w-full edit-modal-panel">
+            <div class="flex justify-between items-center mb-4 modal-sticky-head">
                 <h2 class="text-xl font-bold text-gray-800">Edit Character</h2>
-                <button id="close-edit-modal" class="text-gray-600 hover:text-gray-800">
+                <button id="close-edit-modal" class="modal-close-btn" aria-label="Close">
                     <i class="fas fa-times"></i>
                 </button>
             </div>

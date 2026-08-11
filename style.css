@@ -1358,11 +1358,19 @@ button[id^="delete-msg-"] {
 
 /* Fix for modals on mobile */
 @media (max-width: 768px) {
-    #chat-history-modal > div,
+    #chat-history-modal > div {
+        width: 100%;
+        max-height: none;
+        overflow: visible;
+    }
+
+    /* The edit panel is handled by the overlay scrolling instead, so it must not have a height
+       limit of its own here. Two scrolling containers, one inside the other, is what made the top
+       of it unreachable. */
     #edit-character-modal > div {
-        max-height: 85vh;
-        width: 95%;
-        overflow-y: auto; /* Enable vertical scrolling if content overflows */
+        width: 100%;
+        max-height: none;
+        overflow: visible;
     }
     
     /* Remove sidebar overlay on mobile devices */
@@ -2669,7 +2677,9 @@ button[id^="delete-msg-"] {
     #character-sidebar > div:nth-child(2) {
         padding: 0 1rem 0.75rem !important;
         border-bottom: 1px solid #eceef1;
-        background: #ffffff;
+        /* Inherits the sidebar's own background rather than being told to be white, so it follows
+           the theme instead of needing a second rule to undo it. */
+        background: inherit;
     }
 
     #sidebar-search {
@@ -2732,11 +2742,57 @@ button[id^="delete-msg-"] {
    a five line box.
    --------------------------------------------------------------------------- */
 
-.edit-modal-panel {
-    max-width: 44rem;
-    max-height: calc(100vh - 3rem);
+/* The overlay scrolls, not the panel.
+   
+   The panel used to have its own height limit and its own scrollbar inside an overlay that centred
+   it. When the content was taller than the screen, centring pushed the top of the panel above the
+   viewport with no way to reach it, so the close control could not be scrolled back to. Now the
+   overlay scrolls and the panel is centred with automatic margins, which centres it when it fits
+   and keeps all of it reachable when it does not. */
+.modal-scroll-overlay {
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
+    padding: 1rem;
+}
+
+.edit-modal-panel {
+    max-width: 44rem;
+    /* Centres vertically when there is room, and simply sits at the top when there is not. */
+    margin: auto;
+}
+
+/* The heading stays in view while the rest scrolls, so the close control is always there. */
+.modal-sticky-head {
+    position: sticky;
+    top: -1.5rem;
+    z-index: 2;
+    background: inherit;
+    padding-top: 0.25rem;
+    padding-bottom: 0.75rem;
+    margin-top: -0.25rem;
+}
+
+.modal-close-btn {
+    width: 2.2rem;
+    height: 2.2rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    border-radius: 999px;
+    background: #f3f4f6;
+    color: #4b5563;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: background 0.15s ease;
+}
+
+.modal-close-btn:hover {
+    background: #e5e7eb;
+    color: #111827;
 }
 
 .edit-modal-textarea {
@@ -2800,10 +2856,33 @@ button[id^="delete-msg-"] {
     margin-top: 1rem;
 }
 
-/* The refresh link belongs beside its heading, not on a line of its own. */
-#refresh-storage-btn {
-    float: right;
-    margin-top: -1.9rem;
+/* A heading that carries an action on the right.
+   
+   This used to be done by floating the button and pulling it up with a negative margin, which put
+   it on top of the heading's underline so the text looked struck through. A flex row does the same
+   thing without fighting anything. */
+.settings-card-heading {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.75rem;
+}
+
+.settings-card-action {
+    border: 0;
+    background: transparent;
+    color: var(--color-primary, #4F46E5);
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 0;
+    flex-shrink: 0;
+    /* No underline. It sat on the heading's border and read as a strikethrough. */
+    text-decoration: none;
+}
+
+.settings-card-action:hover {
+    text-decoration: underline;
 }
 
 
@@ -2908,4 +2987,398 @@ button[id^="delete-msg-"] {
 #sidebar-filter-notice {
     margin: 0.5rem 0.75rem 0.25rem;
     font-size: 0.75rem;
+}
+
+/* ---------------------------------------------------------------------------
+   Dark mode.
+
+   Written as overrides on a dark class rather than as a second theme, so there is one
+   set of colours to maintain. The class goes on the html element by a small script in
+   the page head, before anything is painted, so the light theme never appears first.
+
+   The surfaces are dark blue rather than pure black, which is easier to read against for
+   long stretches, and the indigo is lifted a little because the original is too dark to
+   sit on a dark background.
+   --------------------------------------------------------------------------- */
+
+html.dark {
+    color-scheme: dark;
+}
+
+html.dark body {
+    background: #0f1117;
+    color: #e5e7eb;
+}
+
+/* Page surfaces. */
+html.dark .bg-white,
+html.dark .settings-card,
+html.dark .char-card,
+html.dark #chat-home button,
+html.dark .edit-modal-panel,
+html.dark #character-sidebar,
+html.dark #chat-window > div:first-child {
+    background: #171a21 !important;
+    border-color: #262b36 !important;
+    color: #e5e7eb;
+}
+
+html.dark .bg-gray-50,
+html.dark .bg-gray-100 {
+    background: #1d212a !important;
+}
+
+html.dark .char-card-text,
+html.dark #activity-log,
+html.dark .settings-card input,
+html.dark .settings-card select,
+html.dark .settings-card textarea,
+html.dark #sidebar-search,
+html.dark #home-search,
+html.dark .edit-modal-textarea {
+    background: #12151c !important;
+    border-color: #2a3040 !important;
+    color: #e5e7eb !important;
+}
+
+html.dark input::placeholder,
+html.dark textarea::placeholder {
+    color: #6b7280;
+}
+
+/* Text. */
+html.dark .text-gray-800,
+html.dark .text-gray-900,
+html.dark h1, html.dark h2, html.dark h3,
+html.dark .char-card-name,
+html.dark .toast-title {
+    color: #f3f4f6 !important;
+}
+
+html.dark .text-gray-700 { color: #d1d5db !important; }
+html.dark .text-gray-600 { color: #9ca3af !important; }
+html.dark .text-gray-500 { color: #8b93a1 !important; }
+html.dark .text-gray-400 { color: #6b7280 !important; }
+
+/* Borders. */
+html.dark .border,
+html.dark .border-t,
+html.dark .border-b,
+html.dark .settings-divider,
+html.dark hr {
+    border-color: #262b36 !important;
+}
+
+/* The chat itself. Their bubble goes dark, yours keeps the blue, because that contrast is
+   the point of the design. */
+html.dark .character-message {
+    background-color: #23272f !important;
+    color: #e8eaed !important;
+}
+
+html.dark .user-message {
+    background-color: #1982FC !important;
+    color: #ffffff !important;
+}
+
+html.dark .message-bubble em.roleplay-action {
+    color: #9aa3b2 !important;
+}
+
+html.dark #messages-container,
+html.dark #chat-view,
+html.dark #chat-home {
+    background: #0f1117 !important;
+}
+
+/* The header keeps its indigo, lifted slightly so it does not read as a black bar. */
+html.dark #app > header {
+    background: #4338ca !important;
+}
+
+/* Notifications. Glass still, but over a dark surface. */
+html.dark .toast {
+    background: linear-gradient(rgba(28, 32, 41, 0.86), rgba(23, 26, 33, 0.8));
+    border-color: rgba(255, 255, 255, 0.09);
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+html.dark .toast-message { color: #d1d5db; }
+html.dark .toast-close { background: rgba(255, 255, 255, 0.08); color: #9ca3af; }
+
+/* Confirmation dialogs. */
+html.dark #cast-confirm-overlay > div {
+    background: #1b1f27 !important;
+    color: #e5e7eb;
+}
+
+html.dark #cast-confirm-overlay button[data-cast-confirm="no"] {
+    background: #262b36 !important;
+    color: #d1d5db !important;
+}
+
+/* Small tinted surfaces keep their meaning but sit better on dark. */
+html.dark .char-icon-btn { background: #22262f; color: #9ca3af; }
+html.dark .char-enhance-btn { background: rgba(147, 51, 234, 0.18); color: #d8b4fe; }
+html.dark .chat-error-bubble { background: #2a1618; border-color: #4c2226; color: #fca5a5; }
+html.dark .filter-notice { background: rgba(99, 102, 241, 0.13); border-color: rgba(99, 102, 241, 0.28); color: #c7d2fe; }
+html.dark .scene-transition { background: #1a1e26; border-color: #262b36; color: #b6bdc9; }
+html.dark #backup-reminder { background: #1a1f2e !important; color: #d1d5db; }
+
+/* Rows in the character list. */
+html.dark .character-item:hover { background-color: #1d212a !important; }
+html.dark .character-item.selected,
+html.dark .character-item.active { background-color: #232a3d !important; }
+html.dark .char-avatar-letter { background: rgba(99, 102, 241, 0.22); color: #c7d2fe; }
+
+/* Code and quotes inside a reply. */
+html.dark .message-bubble code,
+html.dark .message-bubble pre { background: #12151c !important; color: #e5e7eb; }
+html.dark .message-bubble blockquote { border-left-color: #3a4150; color: #b6bdc9; }
+
+/* ---------------------------------------------------------------------------
+   The log.
+
+   A flat wall of identical lines is no use when something has gone wrong, so a failure
+   looks like a failure and anything since the last backup is brighter than the rest.
+   --------------------------------------------------------------------------- */
+
+.log-line {
+    display: grid;
+    grid-template-columns: auto auto 1fr;
+    gap: 0.5rem;
+    padding: 0.2rem 0.35rem;
+    border-radius: 0.25rem;
+    align-items: baseline;
+}
+
+.log-time {
+    color: #9ca3af;
+    white-space: nowrap;
+}
+
+.log-kind {
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.log-detail {
+    color: #6b7280;
+    overflow-wrap: anywhere;
+}
+
+/* Older than the last backup, so less important now. */
+.log-line { color: #9ca3af; }
+.log-recent { color: #374151; }
+
+.log-error { background: rgba(239, 68, 68, 0.07); }
+.log-error .log-kind { color: #dc2626; }
+.log-warn .log-kind { color: #b45309; }
+.log-info .log-kind { color: #4b5563; }
+
+@media (max-width: 640px) {
+    .log-line {
+        grid-template-columns: 1fr;
+        gap: 0.1rem;
+        padding: 0.35rem;
+        border-bottom: 1px solid #f1f2f4;
+    }
+    .log-kind { font-size: 0.78rem; }
+}
+
+html.dark .log-recent { color: #d1d5db; }
+html.dark .log-line { color: #6b7280; }
+html.dark .log-detail { color: #8b93a1; }
+html.dark .log-error { background: rgba(239, 68, 68, 0.1); }
+html.dark .log-error .log-kind { color: #f87171; }
+html.dark .log-warn .log-kind { color: #fbbf24; }
+html.dark .log-info .log-kind { color: #9ca3af; }
+html.dark .log-line { border-color: #262b36; }
+
+/* ---------------------------------------------------------------------------
+   Dark mode, second pass.
+
+   The first pass missed anything with a colour set by a rule of its own rather than by a
+   utility class, and missed the chat input entirely. An input with no colours of its own
+   falls back to the browser's default dark form control, which is a mid grey that matches
+   nothing else here.
+   --------------------------------------------------------------------------- */
+
+/* The area around the message box had its background set explicitly, so the utility class
+   override never reached it. */
+html.dark .chat-input-container,
+html.dark #chat-input-container {
+    background-color: #12151c !important;
+    border-top-color: #262b36 !important;
+}
+
+/* The message box itself, which had no dark colours at all. */
+html.dark #message-input {
+    background: #1b1f27 !important;
+    border-color: #2a3040 !important;
+    color: #e8eaed !important;
+}
+
+html.dark #message-input::placeholder {
+    color: #7a8290 !important;
+}
+
+/* Anything else with a white background set by a rule rather than a class. */
+html.dark #chat-window,
+html.dark #chat-placeholder,
+html.dark .character-item,
+html.dark #sidebar-characters,
+html.dark #character-list,
+html.dark .modal-content,
+html.dark #edit-character-modal > div {
+    background-color: #171a21 !important;
+}
+
+/* ---------------------------------------------------------------------------
+   Readability in dark mode.
+
+   Grey on dark needs to be lighter than grey on white to read the same. These were carried
+   straight over from the light theme and came out too dim.
+   --------------------------------------------------------------------------- */
+
+html.dark {
+    /* The muted text colours, lifted. */
+    --dark-muted: #a8b0bd;
+    --dark-faint: #8891a0;
+}
+
+html.dark .text-gray-500,
+html.dark .text-gray-600,
+html.dark .char-card-text,
+html.dark .toast-message,
+html.dark .settings-card > p,
+html.dark .settings-card label {
+    color: var(--dark-muted) !important;
+}
+
+html.dark .text-gray-400,
+html.dark .char-card-label,
+html.dark .log-time,
+html.dark .char-card-empty {
+    color: var(--dark-faint) !important;
+}
+
+/* Section labels on the board were almost invisible. */
+html.dark #chat-home h3,
+html.dark #home-count,
+html.dark #home-provider {
+    color: #b4bcc9 !important;
+}
+
+/* The timestamp and the actions under a message. */
+html.dark .message-timestamp,
+html.dark .message-actions,
+html.dark .message-actions button {
+    color: #97a0ae !important;
+}
+
+/* Small print inside a card, which was the hardest thing to read. */
+html.dark .text-xs.text-gray-500,
+html.dark .settings-card .text-xs {
+    color: #9aa3b1 !important;
+}
+
+/* Links keep enough lift to be obviously clickable. */
+html.dark a,
+html.dark .text-primary,
+html.dark .settings-card-action {
+    color: #a5b4fc !important;
+}
+
+/* Code and addresses inside instructions. */
+html.dark code {
+    background: #12151c !important;
+    color: #c7d2fe !important;
+    border-color: #262b36 !important;
+}
+
+/* The list of steps for running a model locally. */
+html.dark ol,
+html.dark ul,
+html.dark li {
+    color: var(--dark-muted);
+}
+
+html.dark .font-semibold.text-gray-700 {
+    color: #dde1e7 !important;
+}
+
+/* Two more rules that set white explicitly, so a utility class override could not reach them.
+   The form wrapping the message box, and the box you get when editing a message in place. */
+html.dark #chat-form {
+    background-color: transparent !important;
+}
+
+html.dark .edit-message-textarea {
+    background-color: #1b1f27 !important;
+    color: #e8eaed !important;
+    border-color: #2a3040 !important;
+}
+
+html.dark .system-continue-indicator {
+    color: #8891a0 !important;
+}
+
+/* The neutral notice bubble in a conversation. */
+html.dark .message-bubble + div .bg-gray-100,
+html.dark .bg-gray-100.text-gray-600 {
+    background: #1d212a !important;
+    color: #a8b0bd !important;
+}
+
+/* The sidebar in dark mode, including the block the search sits in.
+   The heading row and the search share the sidebar's background, so both follow the theme. */
+html.dark #character-sidebar > div:first-child,
+html.dark #character-sidebar > div:nth-child(2) {
+    background: #171a21 !important;
+    border-color: #262b36 !important;
+}
+
+html.dark #sidebar-search {
+    background: #12151c !important;
+    border-color: #2a3040 !important;
+    color: #e8eaed !important;
+}
+
+html.dark #sidebar-search::placeholder {
+    color: #7a8290 !important;
+}
+
+/* The close control on the edit panel. */
+html.dark .modal-close-btn {
+    background: #262b36;
+    color: #a8b0bd;
+}
+
+html.dark .modal-close-btn:hover {
+    background: #323844;
+    color: #f3f4f6;
+}
+
+html.dark .modal-sticky-head {
+    background: #171a21;
+}
+
+
+/* The history panel centres the same way as the edit panel, for the same reason. */
+#chat-history-modal > div {
+    margin: auto;
+    max-width: 34rem;
+    width: 100%;
+}
+
+html.dark #chat-history-modal > div {
+    background: #171a21 !important;
+    color: #e5e7eb;
+}
+
+html.dark #chat-history-modal .border,
+html.dark #chat-history-modal .bg-gray-50 {
+    border-color: #262b36 !important;
+    background: #1d212a !important;
 }

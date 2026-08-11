@@ -1,19 +1,21 @@
 # Netlify configuration.
 #
-# The only thing here that matters is the proxy. Some providers refuse requests that come
-# straight from a web page, so those go through a function running on this site instead. See
+# The only thing here that matters is the proxy. Some providers refuse requests that come straight
+# from a web page, so those go through a function running on this site instead. See
 # netlify/functions/ai-proxy.mjs for why that is necessary.
 
 [build]
-  # Nothing to build. The app is plain files.
-  publish = "."
-  command = ""
+  publish = "public"
+  command = "node build.js"
 
 [functions]
+  # Outside the publish directory on purpose. Netlify does not like the functions directory living
+  # inside what is being published, and it also means the source is not served as static files.
   directory = "netlify/functions"
   node_bundler = "esbuild"
 
-# A tidier address for the proxy than the default one.
+# A tidier address for the proxy. The function itself stays at its default location, so this is the
+# only thing doing the routing.
 [[redirects]]
   from = "/api/proxy"
   to = "/.netlify/functions/ai-proxy"

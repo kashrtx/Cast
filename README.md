@@ -148,6 +148,12 @@ character said it.
 Any filtered list says how many it is hiding and gives you a button to clear it, so a search can
 never quietly make it look as though characters have gone missing.
 
+## Appearance
+
+Settings has light, dark, and match my device. Matching the device follows it as it changes,
+including at sunset if your system does that. The choice is applied before the page is drawn, so the
+light theme never flashes first.
+
 ## Chat layout
 
 Settings has a choice between two arrangements.
@@ -277,9 +283,17 @@ npm start
 
 then open `http://127.0.0.1:3000`. The server needs nothing installed.
 
-To deploy your own, point Netlify at the repository. There is no build step. `netlify.toml` sets the
-functions directory and routes the proxy at `/api/proxy`, and publishes from the root because the
-app is plain files.
+To deploy your own, point Netlify at the repository. `netlify.toml` does the rest.
+
+There is a build step, but only just. `build.js` copies the app into `public/` and that is what gets
+published. It exists because Netlify does not want the functions directory sitting inside the
+directory being published, and publishing the repository root would also serve the source as static
+files. Nothing is compiled, and opening `index.html` from the repository still works exactly as
+before.
+
+If a provider that needs the proxy is not working after deploying, open Settings and press **Test
+the proxy**. It asks the proxy directly and tells you whether the function is running, which is
+quicker than guessing from a failed chat.
 
 ## Tests
 
@@ -287,7 +301,7 @@ app is plain files.
 npm test
 ```
 
-324 tests, no dependencies to install. They use Node's own test runner.
+338 tests, no dependencies to install. They use Node's own test runner.
 
 They cover the parts that can run without a browser: separating reasoning from replies including
 streams split character by character, loading with every kind of damaged data, backup round trips
@@ -299,6 +313,21 @@ Several exist specifically to replay old faults, so if one fails again you will 
 
 Anything involving real network calls, the picture store, or how things look needs a browser and a
 real key to check.
+
+## The log
+
+Settings has an activity and error log, open by default, newest first. It records what changed and
+what failed: characters added, edited and deleted, chats cleared and deleted, messages deleted,
+backups saved and loaded, profiles built, conversations summarised, settings changed, and every
+failure including a reply that did not arrive, a save that did not fit, the proxy not answering,
+data that could not be read, and anything that went wrong unexpectedly.
+
+Failures are marked in red and can be shown on their own with **Failures only**. **Copy** puts the
+whole thing on your clipboard along with which version, provider and model you are on, which is the
+useful thing to paste when asking anyone for help.
+
+Entries since your last backup are brighter than the rest, so it doubles as a record of what you
+would lose.
 
 There is also a structure check for the page itself, which counts tags and watches nesting depth.
 Worth running before committing markup changes:
