@@ -340,10 +340,10 @@
     // Builds the body for an OpenAI style chat request.
     //
     // Note what is not here. There is no instruction telling the model not to
-    // think. That approach never worked. Instead we ask the API to keep
-    // reasoning short using the switches it actually understands, and rely on
-    // the thinking module to tell reasoning and reply apart afterwards.
-    function buildChatBody({ model, messages, maxTokens, temperature, stream }) {
+    // think. That approach never worked. Provider adapters can opt into API
+    // switches they know are supported, and the thinking module tells reasoning
+    // and reply apart afterwards for every response shape.
+    function buildChatBody({ model, messages, maxTokens, temperature, stream, reasoningEffort }) {
         const body = {
             model,
             messages,
@@ -352,9 +352,10 @@
             stream: Boolean(stream),
         };
 
-        // Understood by Ollama's OpenAI endpoint, LM Studio and several hosted
-        // services. Anything that does not know it ignores it.
-        body.reasoning_effort = "low";
+        // This is not part of the common chat-completions contract. Some
+        // otherwise compatible services reject unknown fields instead of
+        // ignoring them, so an adapter must explicitly opt in.
+        if (reasoningEffort) body.reasoning_effort = reasoningEffort;
 
         return body;
     }
@@ -383,7 +384,7 @@
         if (name.includes("gemini-2.5")) {
             config.thinkingConfig = { thinkingBudget: 0, includeThoughts: false };
         } else if (name.includes("gemini-3") || name.includes("flash-latest") || name.includes("pro-latest")) {
-            config.thinkingConfig = { thinkingLevel: "low", includeThoughts: false };
+            config.thinkingConfig = { thinkingLevel: "low", includeThoughts: true };
         }
 
         return config;

@@ -60,6 +60,12 @@ async function sendMessage() {
         return;
     }
 
+    // Navigation is allowed while a model answers. Keep the destination with
+    // the request so a late failure cannot be written into whichever chat is
+    // open by then.
+    const requestChatId = state.activeChat;
+    const requestCharacters = state.activeCharacters.slice();
+
     const messageInput = document.getElementById('message-input');
     const userMessage = messageInput.value.trim();
 
@@ -182,8 +188,8 @@ async function sendMessage() {
         // The character answers rather than the app throwing a wall of text at you. The
         // provider's own error is thousands of characters of JSON, and putting that in the
         // banner filled the screen and pushed the message box out of sight.
-        const character = state.activeCharacters && state.activeCharacters[0];
-        const described = addCharacterUnavailableReply(state.activeChat, character, error);
+        const character = requestCharacters[0];
+        const described = addCharacterUnavailableReply(requestChatId, character, error);
 
         // A short banner as well, since the reply might be scrolled out of view.
         showError(described ? described.short : "No reply came back. Please try again.");

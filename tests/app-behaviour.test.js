@@ -93,6 +93,8 @@ test('what gets sent to the model contains the character and the person', async 
     assert.match(prompt, /Sam/, 'what the app was told about the person should be included');
     assert.match(prompt, /Curious, a bit blunt/);
     assert.match(prompt, /Stay in character/, 'the guidance should be included');
+    assert.match(prompt, /Preserve the user's agency/, 'the model must not write the reader for them');
+    assert.match(prompt, /Vary phrasing/, 'the model should avoid repetitive roleplay habits');
 });
 
 test('a deleted message is hidden from the model but not lost', async () => {
@@ -150,6 +152,57 @@ test('a message from a person is told apart from a reply', async () => {
     const theirs = serialize(run(`createMessageHTML(Object.values(state.chats)[0][1])`));
     assert.notStrictEqual(mine, theirs, 'the two should not render the same way');
     assert.match(theirs, /character-avatar/, 'a reply should show who said it');
+});
+
+test('model thinking is separate, escaped, and individually showable', async () => {
+    const { run } = await withApp(storedFixture());
+    const html = serialize(run(`createMessageHTML(${JSON.stringify({
+        id: 'reasoning-probe', content: 'The spoken reply.',
+        reasoning: '<script>not markup</script>\nConsider continuity.',
+        isUser: false, characterId: fixture.characters[0].id,
+        timestamp: '2025-06-01T10:00:00.000Z', isDeleted: false,
+    })})`));
+
+    assert.match(html, /<details/, 'thinking needs a native show and hide control');
+    assert.match(html, /Model thinking/);
+    assert.match(html, /The spoken reply/);
+    assert.match(html, /not markup/, 'reasoning should remain readable after escaping');
+    const renderer = fs.readFileSync(path.join(__dirname, '../src/app/chat/messages.js'), 'utf8');
+    assert.match(renderer, /reasoningText\.textContent = message\.reasoning\.trim\(\)/,
+        'reasoning must be assigned as text, never executable markup');
+});
+
+test('profile building streams safely without making a card taller', async () => {
+    const enhancer = fs.readFileSync(path.join(__dirname, '../src/app/characters/enhance.js'), 'utf8');
+    const styles = fs.readFileSync(path.join(__dirname, '../style.css'), 'utf8');
+
+    assert.match(enhancer, /callAITextStream\(/, 'profile building should consume live provider output');
+    assert.match(enhancer, /output\.textContent = text/,
+        'streamed provider output must be rendered as safe text');
+    assert.doesNotMatch(enhancer, /enhancedContainer\.innerHTML/,
+        'completed profiles must not append the old expanding output box');
+    assert.match(styles, /\.char-enhance-progress\s*\{[\s\S]*?position:\s*absolute/,
+        'progress should overlay the fixed card rather than changing grid height');
+});
+
+test('profile streaming reads OpenAI events split across network chunks', async () => {
+    const { run } = await withApp(storedFixture());
+    const chunks = [
+        'data: {"choices":[{"delta":{"content":"Live "}}]}\n\nda',
+        'ta: {"choices":[{"delta":{"content":"output"}}]}\n\ndata: [DONE]\n\n',
+    ].map(text => Array.from(Buffer.from(text)));
+
+    const pieces = await run(`(async () => {
+        const chunks = ${JSON.stringify(chunks)}.map(bytes => new Uint8Array(bytes));
+        const seen = [];
+        let index = 0;
+        await readProviderTextStream({ body: { getReader() { return { read: async () =>
+            index < chunks.length ? { value: chunks[index++], done: false } : { done: true }
+        }; } } }, false, chunk => seen.push(CastThinking.readChunk(chunk).replyText));
+        return seen;
+    })()`);
+
+    assert.deepStrictEqual(Array.from(pieces), ['Live ', 'output']);
 });
 
 test('text from a model is routed through the sanitiser', async () => {

@@ -160,7 +160,11 @@ async function getCharacterResponse(characterOrId, userMsg) {
 
             try {
                 // Use a simpler approach for the first message
-                const result = await callGeminiAPI(promptContext);
+                const result = await callGeminiAPI(promptContext, { includeMetadata: true });
+                const firstReply = typeof result === 'string' ? result : result.reply;
+                const firstReasoning = typeof result === 'object' && result
+                    ? String(result.reasoning || '').trim()
+                    : '';
 
                 // Check if we're still generating a response for this character
                 if (state.pendingResponses[character.id] && state.pendingResponses[character.id].chatId === chatId) {
@@ -170,7 +174,8 @@ async function getCharacterResponse(characterOrId, userMsg) {
                     // Add the response as a message
                     addMessage({
                         id: generateUniqueId(),
-                        content: result,
+                        content: firstReply,
+                        reasoning: firstReasoning,
                         isUser: false,
                         characterId: character.id,
                         timestamp: new Date().toISOString(),
@@ -308,13 +313,23 @@ async function getCharacterResponse(characterOrId, userMsg) {
                 // callAIChat now separates reasoning from the reply and refuses a
                 // response that is nothing but reasoning, so anything that comes
                 // back here is real reply text.
-                const localResponse = await callAIChat(localMessages, getConversationTokenLimit());
+                const localResult = await callAIChat(
+                    localMessages,
+                    getConversationTokenLimit(),
+                    { includeMetadata: true }
+                );
+                // Test doubles and older extensions may still return a string.
+                const localResponse = typeof localResult === 'string' ? localResult : localResult.reply;
+                const localReasoning = typeof localResult === 'object' && localResult
+                    ? String(localResult.reasoning || '').trim()
+                    : '';
 
                 if (state.pendingResponses[character.id] && state.pendingResponses[character.id].chatId === chatId) {
                     removeTypingIndicator(typingMsg.id);
                     addMessage({
                         id: generateUniqueId(),
                         content: localResponse,
+                        reasoning: localReasoning,
                         isUser: false,
                         characterId: character.id,
                         timestamp: new Date().toISOString(),
@@ -400,6 +415,7 @@ async function getCharacterResponse(characterOrId, userMsg) {
                 // a tag split across two chunks can never leak into the bubble.
                 // That was the cause of the reasoning showing up mid reply.
                 const reasoningFilter = CastThinking.createStreamFilter();
+                let separateReasoning = "";
                 let sawTruncation = false;
 
                 for await (const chunk of result) {
@@ -411,6 +427,7 @@ async function getCharacterResponse(characterOrId, userMsg) {
                     // text field. On Gemini, parts flagged as thoughts are
                     // reasoning, and the combined field can include them.
                     const piece = CastThinking.readChunk(chunk);
+                    separateReasoning += piece.reasoningText || "";
                     if (piece.finishReason) {
                         const reason = piece.finishReason.toUpperCase();
                         if (reason === "MAX_TOKENS" || reason === "LENGTH") sawTruncation = true;
@@ -452,7 +469,7 @@ async function getCharacterResponse(characterOrId, userMsg) {
                 if (state.pendingResponses[character.id] && state.pendingResponses[character.id].chatId === chatId) {
                     const verdict = CastThinking.verifyReply({
                         reply: accumulatedRawResponse,
-                        reasoning: streamResult.reasoning,
+                        reasoning: separateReasoning + streamResult.reasoning,
                         truncated: sawTruncation,
                         endedInsideReasoning: streamResult.endedInsideReasoning,
                     });
@@ -461,6 +478,7 @@ async function getCharacterResponse(characterOrId, userMsg) {
                         const finalMessageInState = (state.chats[chatId] || []).find(m => m.id === responseMsg.id);
                         if (finalMessageInState) {
                             finalMessageInState.content = verdict.reply;
+                            finalMessageInState.reasoning = (separateReasoning + streamResult.reasoning).trim();
                             setStoredItem(STORAGE_KEYS.CHATS, state.chats);
                         }
                         updateMessageContent(responseMsg.id, verdict.reply, true);
@@ -512,21 +530,15 @@ async function getCharacterResponse(characterOrId, userMsg) {
                             } else {
                                 updateMessageContent(responseMsg.id, emergencyResponse, true);
                             }
+                            // The recovery produced a real reply. Do not continue
+                            // into the failure handler and append an outage message
+                            // after a successful answer.
+                            return;
                         } catch (fallbackError) {
-                            // If even that fails, add an apologetic message
-                            if (!responseMsg) {
-                                removeTypingIndicator(typingMsg.id);
-                                addMessage({
-                                    id: generateUniqueId(),
-                                    content: `*${character.name} seems unable to respond at the moment*`,
-                                    isUser: false,
-                                    characterId: character.id,
-                                    timestamp: new Date().toISOString(),
-                                    isDeleted: false,
-                                });
-                            } else {
-                                updateMessageContent(responseMsg.id, `*${character.name} seems unable to respond at the moment*`, true);
-                            }                        }
+                            // Let the common failure path add one clear, durable
+                            // explanation in the originating conversation.
+                            throw fallbackError;
+                        }
                     }
                 }
                 throw error; // Still throw the error for the outer catch block
@@ -599,19 +611,13 @@ async function getCharacterResponse(characterOrId, userMsg) {
                         // Remove typing indicator
                         removeTypingIndicator(newTypingMsg.id);
 
-                        // Add error message
-                        addMessage({
-                            id: generateUniqueId(),
-                            content: `*${character.name} is unable to respond right now*`,
-                            isUser: false,
-                            characterId: character.id,
-                            timestamp: new Date().toISOString(),
-                            isDeleted: false
-                        });
+                        throw fallbackError;
                     }
                 } else {
                     console.error("API error:", error);
-                    showError(`Failed to get response: ${error.message}`);
+                    // The caller captured the originating chat before navigation
+                    // could change state.activeChat and owns visible reporting.
+                    throw error;
                 }
             }
         } finally {

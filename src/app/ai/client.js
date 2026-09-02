@@ -51,8 +51,8 @@ async function callOpenAiCompatible(messages, maxOutputTokens, providerId) {
     return CastThinking.extractFromResponse(payload);
 }
 
-// Ollama's own endpoint. Kept because it accepts options the OpenAI shaped one
-// does not, including switching reasoning off outright on models that support it.
+// Ollama's own endpoint. Kept because its response shape and generation options
+// differ from the OpenAI-compatible endpoint.
 async function callOllamaNative(messages, maxOutputTokens) {
     const provider = getProviderConfig("ollama");
     const baseUrl = getBaseUrlFor("ollama");
@@ -64,9 +64,6 @@ async function callOllamaNative(messages, maxOutputTokens) {
             model: getModelFor("ollama"),
             messages,
             stream: false,
-            // Ollama understands this directly. On a model that reasons, this
-            // turns it off at the source rather than asking it nicely.
-            think: false,
             options: {
                 temperature: appSettings.temperature,
                 num_predict: getTokenLimit(maxOutputTokens),
@@ -240,7 +237,7 @@ async function ensureAIProviderReady() {
 
 // A single prompt with no conversation around it, used for character context
 // enhancement and for the fallback path.
-async function callAIText(prompt, maxOutputTokens) {
+async function callAIText(prompt, maxOutputTokens, options) {
     await ensureAIProviderReady();
 
     const provider = getProviderConfig();
@@ -255,32 +252,139 @@ async function callAIText(prompt, maxOutputTokens) {
                 temperature: appSettings.temperature,
             }),
         });
-        return finishReply(CastThinking.extractFromResponse(result));
+        return finishReply(CastThinking.extractFromResponse(result), options);
     }
 
     const messages = [{ role: "user", content: prompt }];
     if (provider.kind === CastProviders.KIND.OLLAMA) {
-        return finishReply(await callOllamaNative(messages, maxOutputTokens));
+        return finishReply(await callOllamaNative(messages, maxOutputTokens), options);
     }
-    return finishReply(await callOpenAiCompatible(messages, maxOutputTokens, provider.id));
+    return finishReply(await callOpenAiCompatible(messages, maxOutputTokens, provider.id), options);
 }
 
 // A full conversation.
-async function callAIChat(messages, maxOutputTokens) {
+async function callAIChat(messages, maxOutputTokens, options) {
     await ensureAIProviderReady();
 
     const provider = getProviderConfig();
 
     if (provider.kind === CastProviders.KIND.OLLAMA) {
-        return finishReply(await callOllamaNative(messages, maxOutputTokens));
+        return finishReply(await callOllamaNative(messages, maxOutputTokens), options);
     }
     if (provider.kind === CastProviders.KIND.GEMINI) {
         const flattened = messages
             .map(message => `${String(message.role).toUpperCase()}: ${message.content}`)
             .join("\n\n");
-        return callAIText(flattened, maxOutputTokens);
+        return callAIText(flattened, maxOutputTokens, options);
     }
-    return finishReply(await callOpenAiCompatible(messages, maxOutputTokens, provider.id));
+    return finishReply(await callOpenAiCompatible(messages, maxOutputTokens, provider.id), options);
+}
+
+// Streams a one-off generation, used by profile building so progress is real
+// provider output rather than an indefinite spinner. The three wire formats are
+// normalised into the same callback containing the complete visible text so far.
+async function callAITextStream(prompt, maxOutputTokens, onUpdate) {
+    await ensureAIProviderReady();
+    const provider = getProviderConfig();
+    const filter = CastThinking.createStreamFilter();
+    let reply = '';
+    let reasoning = '';
+
+    const accept = (chunk) => {
+        const piece = CastThinking.readChunk(chunk);
+        reasoning += piece.reasoningText || '';
+        const visible = filter.consume(piece.replyText || '');
+        if (visible) {
+            reply += visible;
+            if (typeof onUpdate === 'function') onUpdate(reply);
+        }
+    };
+
+    if (provider.kind === CastProviders.KIND.GEMINI) {
+        const stream = await state.genaiClient.models.generateContentStream({
+            model: getModelFor('gemini'),
+            contents: prompt,
+            config: CastProviders.buildGeminiConfig({
+                model: getModelFor('gemini'),
+                maxTokens: getTokenLimit(maxOutputTokens),
+                temperature: appSettings.temperature,
+            }),
+        });
+        for await (const chunk of stream) accept(chunk);
+    } else {
+        const isOllama = provider.kind === CastProviders.KIND.OLLAMA;
+        const baseUrl = getBaseUrlFor(provider.id);
+        const response = await fetchProvider(
+            isOllama ? `${baseUrl}/api/chat` : `${baseUrl}/chat/completions`,
+            {
+                method: 'POST',
+                headers: CastProviders.buildHeaders(provider, getApiKeyFor(provider.id)),
+                body: JSON.stringify(isOllama ? {
+                    model: getModelFor('ollama'),
+                    messages: [{ role: 'user', content: prompt }],
+                    stream: true,
+                    options: {
+                        temperature: appSettings.temperature,
+                        num_predict: getTokenLimit(maxOutputTokens),
+                    },
+                } : CastProviders.buildChatBody({
+                    model: getModelFor(provider.id),
+                    messages: [{ role: 'user', content: prompt }],
+                    maxTokens: getTokenLimit(maxOutputTokens),
+                    temperature: appSettings.temperature,
+                    stream: true,
+                })),
+            },
+            provider.id
+        );
+        if (!response.ok) {
+            throw new Error(describeProviderFailure(response.status, await readErrorBody(response), provider));
+        }
+        await readProviderTextStream(response, isOllama, accept);
+    }
+
+    const finished = filter.finish();
+    reply += finished.tail || '';
+    reasoning += finished.reasoning || '';
+    if (finished.tail && typeof onUpdate === 'function') onUpdate(reply);
+    const verdict = CastThinking.verifyReply({
+        reply,
+        reasoning,
+        endedInsideReasoning: finished.endedInsideReasoning,
+    });
+    if (!verdict.ok) throw new Error(verdict.message);
+    return verdict.reply;
+}
+
+async function readProviderTextStream(response, isOllama, accept) {
+    if (!response.body || typeof response.body.getReader !== 'function') {
+        accept(await response.json());
+        return;
+    }
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let pending = '';
+
+    const takeLine = (line) => {
+        let value = line.trim();
+        if (!value) return;
+        if (!isOllama) {
+            if (!value.startsWith('data:')) return;
+            value = value.slice(5).trim();
+            if (value === '[DONE]') return;
+        }
+        try { accept(JSON.parse(value)); } catch (error) { /* wait for a complete event */ }
+    };
+
+    while (true) {
+        const part = await reader.read();
+        pending += decoder.decode(part.value || new Uint8Array(), { stream: !part.done });
+        const lines = pending.split(/\r?\n/);
+        pending = lines.pop() || '';
+        lines.forEach(takeLine);
+        if (part.done) break;
+    }
+    if (pending.trim()) takeLine(pending);
 }
 
 // The last check before a reply is used anywhere.
@@ -289,10 +393,13 @@ async function callAIChat(messages, maxOutputTokens) {
 // reasoning off as something the character said. That is the exact failure the
 // old code had, where a message could be saved containing nothing but the
 // model's working out.
-function finishReply(extracted) {
+function finishReply(extracted, options) {
     const verdict = CastThinking.verifyReply(extracted);
     if (!verdict.ok) {
         throw new Error(verdict.message);
+    }
+    if (options && options.includeMetadata) {
+        return { reply: verdict.reply, reasoning: String(extracted.reasoning || '').trim() };
     }
     return verdict.reply;
 }
@@ -302,9 +409,13 @@ async function callGeminiText(prompt, maxOutputTokens) {
 }
 
 // API communication
-async function callGeminiAPI(prompt) {
+async function callGeminiAPI(prompt, options) {
     try {
-        return await callAIText(prompt, appSettings.enhancedContextTokens || appSettings.maxTokens);
+        return await callAIText(
+            prompt,
+            appSettings.enhancedContextTokens || appSettings.maxTokens,
+            options
+        );
     } catch (error) {
         console.error(`${getProviderDisplayName()} API call failed:`, error);
         state.isApiConnected = false;

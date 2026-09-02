@@ -236,6 +236,11 @@ are tests that check this against a real file from 2025.
 Write your characters expecting ordinary markdown, because that is what models produce without being
 asked.
 
+When a provider supplies separate model reasoning, the reply gets a collapsed **Model thinking**
+section beneath it. Open it when you want to inspect the model's process and close it to keep the
+story uncluttered. Generation Settings has an option to open these sections by default. Thinking is
+kept separate from what the character said and is never sent back as dialogue.
+
 - `*single asterisks*` for actions, gestures and thoughts, shown in italics
 - `**double asterisks**` to stress a word, shown in bold
 - `_underscores_` and `__double underscores__` work the same way, since models mix them

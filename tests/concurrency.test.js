@@ -217,11 +217,16 @@ test('a failure is reported in the chat that failed, not the one on screen', asy
     await c.settle();
 
     const second = c.messagesIn(c.secondChat);
+    const first = c.messagesIn(c.firstChat);
     const strays = second.filter((m) => !m.isUser && m.characterId
         && !read2(c, m.characterId, c.secondChat));
 
     assert.deepStrictEqual(strays, [],
         'a message from a character who is not in this chat appeared in it');
+    assert.ok(first.some((m) => m.characterId && /unavailable right now/i.test(String(m.content))),
+        'the originating chat should contain a durable explanation of the failure');
+    assert.ok(!second.some((m) => /unavailable right now/i.test(String(m.content))),
+        'the chat opened later must not receive the failure explanation');
 });
 
 // Whether a character belongs to a chat, asked of the app itself.

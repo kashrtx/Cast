@@ -45,6 +45,9 @@ let appSettings = {
     // How long to wait on a provider before giving up, in seconds. There was no limit at all before,
     // so a provider that went quiet left the app showing "Connecting..." for good.
     requestTimeoutSeconds: 150,
+    // Reasoning is stored separately from dialogue and stays collapsed unless
+    // the reader chooses to open it (or opts into opening it by default).
+    showReasoningByDefault: false,
 };
 
 // App State

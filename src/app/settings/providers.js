@@ -332,6 +332,7 @@ function initializeModelSettings() {
     const conversationTokens = document.getElementById('conversation-tokens');
     const testModelBtn = document.getElementById('test-model-btn');
     const includeKeyCheckbox = document.getElementById('include-key-in-backups');
+    const reasoningDefault = document.getElementById('show-reasoning-default');
 
     if (temperatureRange && temperatureValue) {
         temperatureRange.value = appSettings.temperature;
@@ -356,6 +357,15 @@ function initializeModelSettings() {
 
     if (includeKeyCheckbox) {
         includeKeyCheckbox.checked = Boolean(appSettings.includeKeyInBackups);
+    }
+
+    if (reasoningDefault) {
+        reasoningDefault.checked = Boolean(appSettings.showReasoningByDefault);
+        reasoningDefault.addEventListener('change', (e) => {
+            appSettings.showReasoningByDefault = e.target.checked;
+            saveAppSettings({ reinitialize: false });
+            updateChatMessages();
+        });
     }
 
     updateProviderSettingsVisibility();

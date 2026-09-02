@@ -16,8 +16,11 @@ async function enhanceCharacterContext(characterId) {
         return;
     }
 
-    // Find the enhance button directly - don't rely on previous selectors
+    // The progress panel overlays the body of the card, so the grid never grows
+    // or jumps while a long profile arrives.
     const enhanceButton = document.querySelector(`#enhance-btn-${characterId}`);
+    const characterItem = document.getElementById(`character-item-${characterId}`);
+    const progress = showEnhanceProgress(characterItem, character.name);
     if (enhanceButton) {
         // Visually update the button
         enhanceButton.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i> Enhancing...';
@@ -32,11 +35,13 @@ async function enhanceCharacterContext(characterId) {
             const initialized = await initializeGeminiAPI();
             if (!initialized) {
                 showError(`Failed to connect to ${getProviderDisplayName()}. Please check your provider settings.`);
+                if (progress) progress.remove();
                 resetEnhanceButton(enhanceButton);
                 return;
             }
         } catch (error) {
             showError(`API initialization failed: ${error.message}`);
+            if (progress) progress.remove();
             resetEnhanceButton(enhanceButton);
             return;
         }
@@ -44,7 +49,11 @@ async function enhanceCharacterContext(characterId) {
 
     // Call API
     try {
-        const enhancedContext = await callEnhanceAPI(character.name, character.userContext);
+        const enhancedContext = await callEnhanceAPI(
+            character.name,
+            character.userContext,
+            (text) => updateEnhanceProgress(progress, text)
+        );
 
         // Write to the live record, not to whatever copy was handed in, otherwise the
         // enhanced profile is saved onto an object nothing else is looking at.
@@ -56,58 +65,65 @@ async function enhanceCharacterContext(characterId) {
         recordActivity(CastLog.KINDS.CHARACTER_ENHANCED, `${character.name}, ${enhancedContext.length} characters`);
         showSuccess(`Character ${character.name} has been enhanced!`);
 
-        // Update the container of this specific character if it exists
-        const characterItem = document.getElementById(`character-item-${characterId}`);
-        if (characterItem) {
-            // Find or create enhanced context container
-            let enhancedContainer = characterItem.querySelector('.enhanced-context');
-            if (!enhancedContainer) {
-                enhancedContainer = document.createElement('div');
-                enhancedContainer.className = 'mt-3 bg-gray-50 p-2 rounded enhanced-context';
-
-                // Insert before the button container
-                const buttonContainer = characterItem.querySelector('.mt-3');
-                if (buttonContainer) {
-                    characterItem.insertBefore(enhancedContainer, buttonContainer);
-                } else {
-                    characterItem.appendChild(enhancedContainer);
-                }
-            }
-
-            // Update the content
-            enhancedContainer.innerHTML = `
-                <p class="text-sm text-gray-700 font-semibold">Enhanced Context:</p>
-                <div class="text-gray-600 text-sm mt-1 max-h-60 overflow-auto p-1 border rounded bg-white">
-                    ${enhancedContext}
-                </div>
-            `;
-
-            // Reset the enhance button
-            resetEnhanceButton(enhanceButton, "Re-Enhance Context");
-        } else {
-            // If we can't find the individual item, update the whole list
-            const characterListContainer = document.getElementById('character-list');
-            if (characterListContainer) {
-                characterListContainer.innerHTML = generateCharacterListHTML();
-            }
-            resetEnhanceButton(enhanceButton);
-        }
+        // Rebuild from the one canonical card template. The former ad-hoc
+        // enhanced-context box permanently changed one card's height and used
+        // unescaped model output as HTML.
+        renderFilteredAndSortedCharacters();
     } catch (error) {
         console.error("Error enhancing character:", error);
         showError(`Failed to enhance character: ${error.message}`);
+        if (progress) progress.remove();
         resetEnhanceButton(enhanceButton);
     }
 }
 
+function showEnhanceProgress(card, characterName) {
+    if (!card) return null;
+    const panel = document.createElement('section');
+    panel.className = 'char-enhance-progress';
+    panel.setAttribute('aria-live', 'polite');
+
+    const heading = document.createElement('div');
+    heading.className = 'char-enhance-progress-head';
+    const spinner = document.createElement('i');
+    spinner.className = 'fas fa-wand-magic-sparkles';
+    const label = document.createElement('span');
+    label.className = 'char-enhance-progress-label';
+    label.textContent = `Building ${characterName}'s profile…`;
+    heading.appendChild(spinner);
+    heading.appendChild(label);
+
+    const output = document.createElement('div');
+    output.className = 'char-enhance-output';
+    output.textContent = 'Connecting to the model…';
+    panel.appendChild(heading);
+    panel.appendChild(output);
+    card.appendChild(panel);
+    return panel;
+}
+
+function updateEnhanceProgress(panel, text) {
+    if (!panel) return;
+    const output = panel.querySelector('.char-enhance-output');
+    if (!output) return;
+    output.textContent = text;
+    output.scrollTop = output.scrollHeight;
+    const label = panel.querySelector('.char-enhance-progress-label');
+    if (label) label.textContent = `Writing profile · ${text.length.toLocaleString()} characters`;
+}
+
 // Helper function to reset enhance button
-function resetEnhanceButton(button, text = 'Enhance Context') {
+function resetEnhanceButton(button) {
     if (button) {
-        button.innerHTML = `<i class="fas fa-magic mr-1"></i> ${text}`;
+        const characterId = button.id.replace(/^enhance-btn-/, '');
+        const character = state.characters.find(entry => entry.id === characterId);
+        const text = character && character.enhancedContext ? 'Rebuild profile' : 'Build profile';
+        button.innerHTML = `<i class="fas fa-wand-magic-sparkles"></i> ${text}`;
         button.disabled = false;
     }
 }
 
-async function callEnhanceAPI(characterName, userContext) {
+async function callEnhanceAPI(characterName, userContext, onUpdate) {
     // Calculate approximate word count based on token limit (0.75 tokens per word)
     const wordLimit = Math.floor(appSettings.enhancedContextTokens * 0.75);
 
@@ -139,8 +155,7 @@ FORMAT AS A COHESIVE PROFILE THAT DEFINES THE CHARACTER'S ESSENCE.
 `;
 
     try {
-        // Use the regular callGeminiAPI function which already uses appSettings
-        const result = await callGeminiAPI(prompt);
+        const result = await callAITextStream(prompt, appSettings.enhancedContextTokens, onUpdate);
         return result;
     } catch (error) {
         console.error("Error enhancing character:", error);
