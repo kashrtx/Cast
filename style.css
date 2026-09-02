@@ -2487,6 +2487,64 @@ button[id^="delete-msg-"] {
     /* Natural height. Stretching to match the tallest card in the row put a large empty
        space inside the short ones, which is what looked unfinished. */
     min-width: 0;
+    position: relative;
+    overflow: hidden;
+}
+
+/* Profile generation occupies the card's existing footprint. Live provider
+   text scrolls inside this layer instead of stretching one grid row. */
+.char-enhance-progress {
+    position: absolute;
+    inset: 3.7rem 0.7rem 0.7rem;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    padding: 0.75rem;
+    border: 1px solid var(--line-1);
+    border-radius: 0.7rem;
+    background: var(--surface-raised);
+    box-shadow: 0 8px 24px rgba(16, 24, 40, 0.12);
+    z-index: var(--z-content);
+}
+
+.char-enhance-progress-head {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex: 0 0 auto;
+    padding-bottom: 0.55rem;
+    color: var(--tint-blue-ink);
+    font-size: 0.75rem;
+    font-weight: 700;
+}
+
+.char-enhance-progress-head i {
+    animation: enhance-pulse 1.1s ease-in-out infinite alternate;
+}
+
+.char-enhance-output {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 0.55rem 0.6rem;
+    border-radius: 0.5rem;
+    background: var(--surface-1);
+    color: var(--ink-2);
+    font-size: 0.74rem;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    scroll-behavior: smooth;
+}
+
+@keyframes enhance-pulse {
+    from { opacity: 0.45; transform: scale(0.92); }
+    to { opacity: 1; transform: scale(1.05); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .char-enhance-progress-head i { animation: none; }
+    .char-enhance-output { scroll-behavior: auto; }
 }
 
 .char-card:hover {

@@ -7,6 +7,20 @@ it is what people paste when asking for help, and it decides which set of bugs y
 Anything marked **fixed** was a real fault someone could hit, and each one has a test named after it so
 it cannot come back quietly.
 
+## 2.28.0
+
+Live, stable character profile rebuilding.
+
+**Added: real streaming output while a profile is built.** Gemini, Ollama, and every OpenAI-style
+provider now stream their profile response into the character card as it arrives. The panel reports
+the growing character count and follows the newest text, so there is immediate proof that the model
+is working rather than an indefinite spinner.
+
+**Fixed: rebuilding one profile changed the height of its card and grid row.** Progress now occupies
+a polished overlay inside the card's existing footprint. On completion the canonical card template
+is rendered again, instead of appending a large one-off enhanced-context box. This also removes the
+old unsafe path that inserted model output through `innerHTML`.
+
 ## 2.27.0
 
 Thinking controls and more natural roleplay.

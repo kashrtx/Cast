@@ -172,6 +172,39 @@ test('model thinking is separate, escaped, and individually showable', async () 
         'reasoning must be assigned as text, never executable markup');
 });
 
+test('profile building streams safely without making a card taller', async () => {
+    const enhancer = fs.readFileSync(path.join(__dirname, '../src/app/characters/enhance.js'), 'utf8');
+    const styles = fs.readFileSync(path.join(__dirname, '../style.css'), 'utf8');
+
+    assert.match(enhancer, /callAITextStream\(/, 'profile building should consume live provider output');
+    assert.match(enhancer, /output\.textContent = text/,
+        'streamed provider output must be rendered as safe text');
+    assert.doesNotMatch(enhancer, /enhancedContainer\.innerHTML/,
+        'completed profiles must not append the old expanding output box');
+    assert.match(styles, /\.char-enhance-progress\s*\{[\s\S]*?position:\s*absolute/,
+        'progress should overlay the fixed card rather than changing grid height');
+});
+
+test('profile streaming reads OpenAI events split across network chunks', async () => {
+    const { run } = await withApp(storedFixture());
+    const chunks = [
+        'data: {"choices":[{"delta":{"content":"Live "}}]}\n\nda',
+        'ta: {"choices":[{"delta":{"content":"output"}}]}\n\ndata: [DONE]\n\n',
+    ].map(text => Array.from(Buffer.from(text)));
+
+    const pieces = await run(`(async () => {
+        const chunks = ${JSON.stringify(chunks)}.map(bytes => new Uint8Array(bytes));
+        const seen = [];
+        let index = 0;
+        await readProviderTextStream({ body: { getReader() { return { read: async () =>
+            index < chunks.length ? { value: chunks[index++], done: false } : { done: true }
+        }; } } }, false, chunk => seen.push(CastThinking.readChunk(chunk).replyText));
+        return seen;
+    })()`);
+
+    assert.deepStrictEqual(Array.from(pieces), ['Live ', 'output']);
+});
+
 test('text from a model is routed through the sanitiser', async () => {
     // The app's defence against a model returning markup is DOMPurify, which is a library and is
     // tested as one. What is ours to get right is that every reply goes through it, and that the
