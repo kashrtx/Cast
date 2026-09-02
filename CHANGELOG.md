@@ -7,6 +7,41 @@ it is what people paste when asking for help, and it decides which set of bugs y
 Anything marked **fixed** was a real fault someone could hit, and each one has a test named after it so
 it cannot come back quietly.
 
+## 2.27.0
+
+Thinking controls and more natural roleplay.
+
+**Added: model thinking can be inspected without leaking into the roleplay.** Providers that return
+reasoning now keep it beside the reply as separate data. Each reply has a compact, accessible
+**Model thinking** disclosure that can be opened and closed, and Generation Settings can choose
+whether those disclosures start open. Reasoning is plain text, never executable markup, and is not
+sent back as dialogue on later turns.
+
+**Improved: roleplay guidance protects the reader's agency and continuity.** Characters are now told
+not to invent the reader's dialogue, actions, feelings, or consent; to answer the latest turn before
+moving the scene; to avoid repetitive gestures and phrasing; and to preserve established scene and
+relationship facts. Replies are also directed to leave room for the reader rather than resolving an
+entire scene at once.
+
+**Fixed: a recovered streaming reply could still be followed by an outage notice.** A successful
+emergency retry now ends the request as a success.
+
+## 2.26.0
+
+Provider compatibility and failure handling.
+
+**Fixed: OpenAI-compatible providers were all sent a provider-specific option.** The shared request
+body included `reasoning_effort` for every service. That field is not part of the common chat
+completions format, and compatible services may reject fields they do not understand. The common
+request now contains only portable fields; an adapter can still opt in when its provider explicitly
+supports reasoning effort.
+
+**Fixed: a failed reply could be reported in whichever chat was open later.** Successful replies
+already remembered their originating conversation, but the final failure handler read the currently
+open chat and character. The request now captures its destination, and one durable failure reply is
+written there without duplicate fallback apologies. A successful emergency retry is also treated as
+success instead of being followed by an outage message.
+
 ## 2.25.0
 
 Requests that never come back.

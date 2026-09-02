@@ -51,8 +51,8 @@ async function callOpenAiCompatible(messages, maxOutputTokens, providerId) {
     return CastThinking.extractFromResponse(payload);
 }
 
-// Ollama's own endpoint. Kept because it accepts options the OpenAI shaped one
-// does not, including switching reasoning off outright on models that support it.
+// Ollama's own endpoint. Kept because its response shape and generation options
+// differ from the OpenAI-compatible endpoint.
 async function callOllamaNative(messages, maxOutputTokens) {
     const provider = getProviderConfig("ollama");
     const baseUrl = getBaseUrlFor("ollama");
@@ -64,9 +64,6 @@ async function callOllamaNative(messages, maxOutputTokens) {
             model: getModelFor("ollama"),
             messages,
             stream: false,
-            // Ollama understands this directly. On a model that reasons, this
-            // turns it off at the source rather than asking it nicely.
-            think: false,
             options: {
                 temperature: appSettings.temperature,
                 num_predict: getTokenLimit(maxOutputTokens),
@@ -240,7 +237,7 @@ async function ensureAIProviderReady() {
 
 // A single prompt with no conversation around it, used for character context
 // enhancement and for the fallback path.
-async function callAIText(prompt, maxOutputTokens) {
+async function callAIText(prompt, maxOutputTokens, options) {
     await ensureAIProviderReady();
 
     const provider = getProviderConfig();
@@ -255,32 +252,32 @@ async function callAIText(prompt, maxOutputTokens) {
                 temperature: appSettings.temperature,
             }),
         });
-        return finishReply(CastThinking.extractFromResponse(result));
+        return finishReply(CastThinking.extractFromResponse(result), options);
     }
 
     const messages = [{ role: "user", content: prompt }];
     if (provider.kind === CastProviders.KIND.OLLAMA) {
-        return finishReply(await callOllamaNative(messages, maxOutputTokens));
+        return finishReply(await callOllamaNative(messages, maxOutputTokens), options);
     }
-    return finishReply(await callOpenAiCompatible(messages, maxOutputTokens, provider.id));
+    return finishReply(await callOpenAiCompatible(messages, maxOutputTokens, provider.id), options);
 }
 
 // A full conversation.
-async function callAIChat(messages, maxOutputTokens) {
+async function callAIChat(messages, maxOutputTokens, options) {
     await ensureAIProviderReady();
 
     const provider = getProviderConfig();
 
     if (provider.kind === CastProviders.KIND.OLLAMA) {
-        return finishReply(await callOllamaNative(messages, maxOutputTokens));
+        return finishReply(await callOllamaNative(messages, maxOutputTokens), options);
     }
     if (provider.kind === CastProviders.KIND.GEMINI) {
         const flattened = messages
             .map(message => `${String(message.role).toUpperCase()}: ${message.content}`)
             .join("\n\n");
-        return callAIText(flattened, maxOutputTokens);
+        return callAIText(flattened, maxOutputTokens, options);
     }
-    return finishReply(await callOpenAiCompatible(messages, maxOutputTokens, provider.id));
+    return finishReply(await callOpenAiCompatible(messages, maxOutputTokens, provider.id), options);
 }
 
 // The last check before a reply is used anywhere.
@@ -289,10 +286,13 @@ async function callAIChat(messages, maxOutputTokens) {
 // reasoning off as something the character said. That is the exact failure the
 // old code had, where a message could be saved containing nothing but the
 // model's working out.
-function finishReply(extracted) {
+function finishReply(extracted, options) {
     const verdict = CastThinking.verifyReply(extracted);
     if (!verdict.ok) {
         throw new Error(verdict.message);
+    }
+    if (options && options.includeMetadata) {
+        return { reply: verdict.reply, reasoning: String(extracted.reasoning || '').trim() };
     }
     return verdict.reply;
 }
@@ -302,9 +302,13 @@ async function callGeminiText(prompt, maxOutputTokens) {
 }
 
 // API communication
-async function callGeminiAPI(prompt) {
+async function callGeminiAPI(prompt, options) {
     try {
-        return await callAIText(prompt, appSettings.enhancedContextTokens || appSettings.maxTokens);
+        return await callAIText(
+            prompt,
+            appSettings.enhancedContextTokens || appSettings.maxTokens,
+            options
+        );
     } catch (error) {
         console.error(`${getProviderDisplayName()} API call failed:`, error);
         state.isApiConnected = false;
