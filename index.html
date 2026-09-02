@@ -291,6 +291,14 @@
                                         min="1" max="600" value="150">
                                     <p class="text-xs text-gray-500 mt-1">Seconds to wait for a reply before giving up and telling you. A very large model can take a while to start; raise this if you are being cut off while it is still thinking.</p>
                                 </div>
+
+                                <label class="flex items-start gap-3 rounded-lg border p-3 cursor-pointer">
+                                    <input type="checkbox" id="show-reasoning-default" class="mt-1 rounded border-gray-300" />
+                                    <span>
+                                        <span class="block text-gray-700 font-medium">Open model thinking by default</span>
+                                        <span class="block text-xs text-gray-500 mt-1">When a provider returns thinking, it appears separately beneath the reply. You can always show or hide it on each message.</span>
+                                    </span>
+                                </label>
                             </div>
 
                             <div class="mt-6 border-t pt-4">

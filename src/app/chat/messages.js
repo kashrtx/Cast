@@ -201,6 +201,21 @@ function createMessageHTML(message) {
         bubbleDiv.classList.add('character-message');
         timestampDiv.classList.add('ml-2');
 
+        // Reasoning never shares the dialogue bubble and is never treated as
+        // something the character said. A native disclosure keeps it compact,
+        // keyboard accessible, and individually showable/hideable.
+        if (typeof message.reasoning === 'string' && message.reasoning.trim()) {
+            const reasoningDetails = createElement('details', ['reasoning-disclosure']);
+            reasoningDetails.open = Boolean(appSettings.showReasoningByDefault);
+            const reasoningSummary = createElement('summary', ['reasoning-summary']);
+            reasoningSummary.textContent = 'Model thinking';
+            const reasoningText = createElement('div', ['reasoning-text']);
+            reasoningText.textContent = message.reasoning.trim();
+            reasoningDetails.appendChild(reasoningSummary);
+            reasoningDetails.appendChild(reasoningText);
+            messageContainerInner.appendChild(reasoningDetails);
+        }
+
 
         const isLastCharacterMessage = (() => {
             if (!state.activeChat) return false;

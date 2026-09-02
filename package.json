@@ -1,6 +1,6 @@
 {
   "name": "cast",
-  "version": "2.25.0",
+  "version": "2.27.0",
   "description": "Cast. A browser app for roleplay chats with characters you write yourself, using whichever AI provider you like.",
   "type": "commonjs",
   "scripts": {

@@ -129,9 +129,9 @@ test("a chat body carries the model, messages and limits", () => {
     assert.strictEqual(body.stream, true);
 });
 
-test("a chat body asks for low reasoning effort rather than begging in the prompt", () => {
+test("a common chat body omits provider-specific reasoning fields", () => {
     const body = P.buildChatBody({ model: "m", messages: [], maxTokens: 100 });
-    assert.strictEqual(body.reasoning_effort, "low");
+    assert.strictEqual(body.reasoning_effort, undefined);
     // The old code pushed an instruction into the messages. It never worked and
     // it polluted the character's persona, so it must not come back.
     const asText = JSON.stringify(body);
@@ -139,10 +139,17 @@ test("a chat body asks for low reasoning effort rather than begging in the promp
     assert.ok(!/do not output chain-of-thought/i.test(asText));
 });
 
+test("an adapter can opt into a supported reasoning effort", () => {
+    const body = P.buildChatBody({
+        model: "m", messages: [], maxTokens: 100, reasoningEffort: "low",
+    });
+    assert.strictEqual(body.reasoning_effort, "low");
+});
+
 test("gemini 3 models get a thinking level", () => {
     const config = P.buildGeminiConfig({ model: "gemini-3.6-flash", maxTokens: 2048 });
     assert.strictEqual(config.thinkingConfig.thinkingLevel, "low");
-    assert.strictEqual(config.thinkingConfig.includeThoughts, false);
+    assert.strictEqual(config.thinkingConfig.includeThoughts, true);
 });
 
 test("gemini 2.5 models get a thinking budget of zero", () => {
@@ -150,13 +157,11 @@ test("gemini 2.5 models get a thinking budget of zero", () => {
     assert.strictEqual(config.thinkingConfig.thinkingBudget, 0);
 });
 
-test("gemini config never asks for thoughts to be included", () => {
-    ["gemini-3.6-flash", "gemini-3.5-flash-lite", "gemini-2.5-flash"].forEach((model) => {
-        const config = P.buildGeminiConfig({ model, maxTokens: 1000 });
-        if (config.thinkingConfig) {
-            assert.strictEqual(config.thinkingConfig.includeThoughts, false, model);
-        }
-    });
+test("gemini thought summaries are exposed only for models that can return them", () => {
+    assert.strictEqual(P.buildGeminiConfig({ model: "gemini-3.6-flash", maxTokens: 1000 })
+        .thinkingConfig.includeThoughts, true);
+    assert.strictEqual(P.buildGeminiConfig({ model: "gemini-2.5-flash", maxTokens: 1000 })
+        .thinkingConfig.includeThoughts, false);
 });
 
 // --- Token limits ---
